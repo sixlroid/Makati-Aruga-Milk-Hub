@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+
+model Users {
+  user_id         Int               @id @default(autoincrement())
+  email           String            @unique
+  role            String
+  password        String
+
+  Staff_Profile   Staff_Profiles?
+  Member_Profile  Member_Profiles?
+}
+
+model Staff_Profiles {
+  staff_id        Int               @id
+  user            Users             @relation(fields: [staff_id], references: [user_id])
+
+  tracking_no     String            @unique
+  last_name       String
+  first_name      String
+  middle_initial  String?
+  email           String            @unique
+  phone_number    String
+  ethnicity       String
+  date_of_birth   DateTime
+  status          String
+
+  Inquiries       Inquiries[]
+  Milk_Batches    Milk_Batches[]
+  Transactions    Transactions[]
+  Audit_Logs      Audit_Logs[]
+}
+
+model Member_Profiles {
+  member_id          Int                 @id
+  user               Users               @relation(fields: [member_id], references: [user_id])
+
+  tracking_no        String              @unique
+  last_name          String
+  first_name         String
+  middle_initial     String?
+  email              String?
+  phone_number       String
+  job                String
+  ethnicity          String
+  date_of_birth      DateTime
+  status             String
+  info_source        String
+
+  medical_docs       String?
+
+  Health_Screenings  Health_Screenings[]
+  Raw_Collections    Raw_Collections[]
+  Transactions       Transactions[]
+}
+
+model Health_Screenings {
+  screening_id             Int               @id @default(autoincrement())
+
+  member_id                Int
+  member                   Member_Profiles   @relation(fields: [member_id], references: [member_id])
+
+  donor_classification     String
+  classification_specifics String?
+
+  traveled_abroad          Boolean
+  travel_country           String?
+  travel_reason            String?
+
+  donation_reason          String            @db.Text
+
+  // Spouse's Consent
+  spouse_consent           Boolean
+
+  // Questionnaire responses
+  health_history_answers   Json?
+
+  created_at               DateTime          @default(now())
+}
+
+model Inquiries {
+  inquiry_id      Int               @id @default(autoincrement())
+  requester_name  String
+  contact_info    String
+  required_volume Int
+  status          String
+
+  logged_by       Int
+  staff           Staff_Profiles    @relation(fields: [logged_by], references: [staff_id])
+}
+
+model Raw_Collections {
+  collection_id   Int               @id @default(autoincrement())
+
+  donor_id        Int
+  donor           Member_Profiles   @relation(fields: [donor_id], references: [member_id])
+
+  program_source  String
+  raw_volume_ml   Int
+  date_collected  DateTime          @default(now())
+
+  batch_id        Int?
+  batch           Milk_Batches?     @relation(fields: [batch_id], references: [batch_id])
+}
+
+model Milk_Batches {
+  batch_id        Int               @id @default(autoincrement())
+
+  pooled_volume   Int
+  current_volume  Int
+  lab_status      String            @default("Pending")
+  expiry_date     DateTime?
+
+  tested_by       Int?
+  staff           Staff_Profiles?   @relation(fields: [tested_by], references: [staff_id])
+
+  Raw_Collections Raw_Collections[]
+  Transactions    Transactions[]
+}
+
+model Transactions {
+  trans_id        Int               @id @default(autoincrement())
+
+  receiver_id     Int
+  receiver        Member_Profiles   @relation(fields: [receiver_id], references: [member_id])
+
+  batch_id        Int
+  batch           Milk_Batches      @relation(fields: [batch_id], references: [batch_id])
+
+  dispensed_vol   Int
+  base_fee        Decimal
+  deposit_fee     Decimal
+  total_fee       Decimal
+
+  processed_by    Int
+  staff           Staff_Profiles    @relation(fields: [processed_by], references: [staff_id])
+
+  timestamp       DateTime          @default(now())
+}
+
+model Audit_Logs {
+  log_id          Int               @id @default(autoincrement())
+
+  staff_id        Int
+  staff           Staff_Profiles    @relation(fields: [staff_id], references: [staff_id])
+
+  action_type     String
+  record_affected String
+  timestamp       DateTime          @default(now())
+}
