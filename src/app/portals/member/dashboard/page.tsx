@@ -1,22 +1,154 @@
-export default function MemberDashboard() {
-  return (
-    <div className="min-h-screen bg-slate-50 flex font-body">
-      {/* Sidebar Placeholder */}
-      <div className="w-64 bg-white border-r border-slate-200 p-6 hidden md:block">
-        <h2 className="text-xl font-black text-[#E04A75] font-heading mb-8">MAMH Portal</h2>
-        <nav className="space-y-2">
-          <div className="text-sm font-bold text-[#E04A75] bg-[#FFF0F3] p-3 rounded-lg cursor-pointer">My Dashboard</div>
-          <div className="text-sm font-bold text-slate-500 hover:bg-slate-50 p-3 rounded-lg cursor-pointer">Donation History</div>
-          <div className="text-sm font-bold text-slate-500 hover:bg-slate-50 p-3 rounded-lg cursor-pointer">Request Milk</div>
-        </nav>
-      </div>
+'use client';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
-      {/* Main Content */}
-      <div className="flex-1 p-8 lg:p-12">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Member Dashboard</h1>
-        <p className="text-slate-500 bg-white p-6 rounded-xl border border-slate-200 mt-6">
-          Welcome to the donor and receiver portal! Once the login system is wired up, your real profile data will appear here.
-        </p>
+export default function MemberDashboard() {
+  // Sandbox tracking tokens
+  const [inputMtn, setInputMtn] = useState('MTN-644013'); 
+  const [activeMtn, setActiveMtn] = useState('MTN-644013');
+
+  const [profile, setProfile] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchMemberData = async (mtnStr: string) => {
+    if (!mtnStr) return;
+    setLoading(true);
+    try {
+      // Force the browser fetching thread to bypass its local memory store completely
+      const res = await fetch(`/api/member/profile?mtn=${mtnStr}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) {
+        setProfile(data.member);
+        setHistory(data.history);
+      } else {
+        setProfile(null);
+        setHistory([]);
+      }
+    } catch (error) {
+      console.error("Failed to load user portal", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMemberData(activeMtn);
+  }, [activeMtn]);
+
+  // Compute lifetime metrics aggregations
+  const totalVolumeDonated = history.reduce((sum, item) => sum + item.raw_volume_ml, 0);
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-body pb-12">
+      
+      
+
+      <div className="max-w-4xl mx-auto mt-8 px-4">
+        {loading ? (
+          <div className="text-center py-20 text-slate-400 text-sm font-medium">Re-syncing biological logs from cloud framework context...</div>
+        ) : !profile ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center max-w-md mx-auto mt-12">
+            <span className="text-4xl">🔍</span>
+            <h2 className="text-base font-bold text-slate-800 mt-4">Account Profile Index Deficit</h2>
+            <p className="text-xs text-slate-400 mt-2">The context tag <span className="font-mono font-bold text-slate-600">"${activeMtn}"</span> does not currently match any tracked registration profile inside the infrastructure cluster setup.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            
+            {/* PERSONAL WELCOME ROW */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight font-heading">
+                  Mabuhay, {profile.first_name} {profile.last_name}!
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">Thank you for helping save fragile lives across Makati City neonatal networks.</p>
+              </div>
+              <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 font-mono text-center shrink-0">
+                <span className="block text-[9px] uppercase tracking-wider font-black text-slate-400">Your Tracking Code</span>
+                <span className="text-sm font-black text-slate-700">{profile.tracking_no}</span>
+              </div>
+            </div>
+
+            {/* LIVE VERIFICATION TESTING STATUS CONTROL BADGE CARD */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Clearance Status Block */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm md:col-span-2 flex items-center justify-between relative overflow-hidden">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Clinical Clearance Status</span>
+                  <div className="text-xl font-black text-slate-800 mt-1 font-heading">
+                    {profile.status === 'Approved' && '✅ Approved for Donation'}
+                    {profile.status === 'Deferred' && '🚫 Quarantined / Deferred'}
+                    {profile.status === 'Single' && '⏳ Profile Pending Review'}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md">
+                    {profile.status === 'Approved' && 'Your medical documentation has been cleared by clinical desk operations. You are certified to distribute raw expressions.'}
+                    {profile.status === 'Deferred' && 'Clinical indicator alerts were raised during your questionnaire evaluation. Active donation status has been paused.'}
+                    {profile.status === 'Single' && 'Your initial file has been successfully staged. Please report to the nurse desk to run an Appendix G-1 physical evaluation loop.'}
+                  </p>
+                </div>
+                
+                <div className={`absolute top-0 right-0 h-full w-3 shrink-0 ${
+                  profile.status === 'Approved' ? 'bg-emerald-500' : profile.status === 'Deferred' ? 'bg-red-500' : 'bg-amber-400'
+                }`} />
+              </div>
+
+              {/* Lifetime Volume Metrics */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lifetime Contributions</span>
+                <div className="text-3xl font-black text-[#E04A75] font-heading mt-1">{totalVolumeDonated} mL</div>
+                <span className="text-[11px] text-slate-500 font-bold block mt-1">Across {history.length} Individual Bottles</span>
+              </div>
+
+            </div>
+
+            {/* MEMBER LOG ENTRY ROW LEDGER */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
+                <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Your Personal Storage History Ledger</h2>
+              </div>
+
+              {history.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 text-xs font-medium">
+                  You haven't logged any physical milk storage deposits in the database pipeline yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                        <th className="py-3 px-6">Physical Bottle ID</th>
+                        <th className="py-3 px-6">Date Lodged</th>
+                        <th className="py-3 px-6">Volume Level</th>
+                        <th className="py-3 px-6">Campaign Source</th>
+                        <th className="py-3 px-6">Processing Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
+                      {history.map((bottle) => (
+                        <tr key={bottle.collection_id} className="hover:bg-slate-50/30">
+                          <td className="py-4 px-6 font-mono font-bold text-slate-400">#BOT-{bottle.collection_id}</td>
+                          <td className="py-4 px-6 text-slate-500">{new Date(bottle.date_collected).toLocaleDateString('en-GB')}</td>
+                          <td className="py-4 px-6 font-black text-slate-800">{bottle.raw_volume_ml} mL</td>
+                          <td className="py-4 px-6 text-slate-400">{bottle.program_source}</td>
+                          <td className="py-4 px-6">
+                            {bottle.batch_id === null ? (
+                              <span className="text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-bold uppercase text-[9px]">Cold Storage / Pending</span>
+                            ) : (
+                              <span className="text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-bold uppercase text-[9px]">Pasteurized (Batch #{bottle.batch_id})</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
       </div>
     </div>
   );
