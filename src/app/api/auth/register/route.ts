@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { assignMissingMemberIdentifiers } from '@/lib/identifiers';
 
 const prisma = new PrismaClient();
 
@@ -35,6 +36,15 @@ export async function POST(request: Request) {
           }
         }
       });
+
+      const memberProfile = await prisma.member_Profiles.findUnique({
+        where: { member_id: newUser.user_id }
+      });
+
+      if (memberProfile) {
+        await assignMissingMemberIdentifiers(memberProfile.member_id, prisma);
+      }
+
       return NextResponse.json({ message: "Member registered!", user: newUser }, { status: 201 });
     } 
     

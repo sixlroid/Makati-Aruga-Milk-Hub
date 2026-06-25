@@ -44,6 +44,8 @@ model Member_Profiles {
   user               Users               @relation(fields: [member_id], references: [user_id])
 
   tracking_no        String              @unique
+  dtn                String?             @unique
+  rtn                String?             @unique
   last_name          String
   first_name         String
   middle_initial     String?

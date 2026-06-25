@@ -1,38 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { assignMissingMemberIdentifiers } from '@/lib/identifiers';
 
 const prisma = new PrismaClient();
 
-// CRITICAL: Tells Next.js to completely disable caching for this route handler
-export const dynamic = 'force-dynamic'; 
+export const dynamic = 'force-dynamic';
+
+async function findMemberByTracking(input: string) {
+  const normalized = input.toUpperCase().trim();
+
+  return prisma.member_Profiles.findFirst({
+    where: {
+      OR: [
+        { tracking_no: normalized },
+        { dtn: normalized },
+        { rtn: normalized }
+      ]
+    }
+  });
+}
 
 export async function GET(request: NextRequest) {
   try {
     const mtn = request.nextUrl.searchParams.get('mtn');
 
     if (!mtn) {
-      return NextResponse.json({ error: "Missing tracking number parameter." }, { status: 400 });
+      return NextResponse.json({ error: 'Missing tracking number parameter.' }, { status: 400 });
     }
 
-    // Fetch the target profile out of the database mapping index
-    const member = await prisma.member_Profiles.findUnique({
-      where: { tracking_no: mtn.toUpperCase().trim() }
-    });
+    const member = await findMemberByTracking(mtn);
 
     if (!member) {
-      return NextResponse.json({ error: "No member profile found." }, { status: 404 });
+      return NextResponse.json({ error: 'No member profile found.' }, { status: 404 });
     }
 
-    // Pull historical records matching their verified ID
+    const withIdentifiers = await assignMissingMemberIdentifiers(member.member_id, prisma);
     const history = await prisma.raw_Collections.findMany({
       where: { donor_id: member.member_id },
       orderBy: { date_collected: 'desc' }
     });
 
-    return NextResponse.json({ member, history }, { status: 200 });
-
+    return NextResponse.json({ member: withIdentifiers, history }, { status: 200 });
   } catch (error) {
-    console.error("MEMBER PORTAL API ERROR:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error('MEMBER PORTAL API ERROR:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const data = await request.json();
+    const tracking = data.tracking_no || data.mtn;
+
+    if (!tracking) {
+      return NextResponse.json({ error: 'Tracking number is required.' }, { status: 400 });
+    }
+
+    const member = await findMemberByTracking(tracking);
+
+    if (!member) {
+      return NextResponse.json({ error: 'No member profile found.' }, { status: 404 });
+    }
+
+    const updatedMember = await prisma.member_Profiles.update({
+      where: { member_id: member.member_id },
+      data: {
+        first_name: data.first_name ?? member.first_name,
+        last_name: data.last_name ?? member.last_name,
+        middle_initial: data.middle_initial ?? member.middle_initial,
+        email: data.email ?? member.email,
+        phone_number: data.phone_number ?? member.phone_number,
+        medical_docs: data.medical_docs ?? member.medical_docs
+      }
+    });
+
+    const withIdentifiers = await assignMissingMemberIdentifiers(updatedMember.member_id, prisma);
+
+    return NextResponse.json({ member: withIdentifiers }, { status: 200 });
+  } catch (error) {
+    console.error('MEMBER PROFILE UPDATE ERROR:', error);
+    return NextResponse.json({ error: 'Unable to update profile.' }, { status: 500 });
   }
 }
