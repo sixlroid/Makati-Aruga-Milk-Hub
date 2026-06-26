@@ -25,8 +25,14 @@ export default function NurseDashboard() {
   const [isDispensing, setIsDispensing] = useState(false);
   const [showLabel, setShowLabel] = useState(false);
   const [labelData, setLabelData] = useState<any>(null);
-  // DYNAMIC CALCULATOR: Let's assume outside hospitals pay ₱1.50 per mL for processing
-  const computedCost = hospital === 'outside_makati' ? (Number(dispenseVolume) || 0) * 1.5 : 0;
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [inquiryForm, setInquiryForm] = useState({ requester_name: '', contact_info: '', required_volume: '' });
+  const [isSavingInquiry, setIsSavingInquiry] = useState(false);
+  const RATE_PER_ML = 2.0;
+  const BOTTLE_DEPOSIT = 50;
+  const computedCost = hospital === 'outside_makati'
+    ? (Number(dispenseVolume) || 0) * RATE_PER_ML + BOTTLE_DEPOSIT
+    : 0;
 
   // --- FETCH STATS ON LOAD ---
   const fetchStats = async () => {
@@ -38,8 +44,18 @@ export default function NurseDashboard() {
     }
   };
 
+  const fetchInquiries = async () => {
+    try {
+      const res = await fetch('/api/inquiries');
+      if (res.ok) setInquiries(await res.json());
+    } catch (error) {
+      console.error('Failed to load inquiries', error);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
+    fetchInquiries();
   }, []);
 
   // --- HANDLER: LOG RAW DONATION ---
@@ -101,6 +117,34 @@ export default function NurseDashboard() {
       alert(`Submission failed: ${error.message}`);
     } finally {
       setIsDispensing(false);
+    }
+  };
+
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingInquiry(true);
+    try {
+      const response = await fetch('/api/inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_name: inquiryForm.requester_name,
+          contact_info: inquiryForm.contact_info,
+          required_volume: inquiryForm.required_volume
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setInquiries(prev => [data.inquiry, ...prev].slice(0, 10));
+        setInquiryForm({ requester_name: '', contact_info: '', required_volume: '' });
+        alert('Inquiry saved successfully.');
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error: any) {
+      alert(`Submission failed: ${error.message}`);
+    } finally {
+      setIsSavingInquiry(false);
     }
   };
 
@@ -215,11 +259,14 @@ export default function NurseDashboard() {
               </div>
 
               {/* DYNAMIC PRICE CALCULATOR */}
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex justify-between items-center transition-all mt-2">
-                 <span className="text-xs text-slate-500 font-bold uppercase">Computed Processing Rates</span>
-                 <span className="text-lg font-black text-slate-800 font-heading">
-                   ₱{computedCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                 </span>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 transition-all mt-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 font-bold uppercase">Computed Processing Rates</span>
+                  <span className="text-lg font-black text-slate-800 font-heading">
+                    ₱{computedCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">Standard rate: ₱2.00 per mL plus a bottle deposit fee.</p>
               </div>
 
               <div className="mt-auto pt-4">
@@ -230,6 +277,64 @@ export default function NurseDashboard() {
             </form>
           </div>
 
+        </div>
+
+        {/* MODULE 3: INQUIRIES & INTAKE REGISTRY */}
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-[#E04A75] font-heading mb-1">Inquiries & Intake Registry</h3>
+              <p className="text-xs text-slate-500">Log phone or walk-in requests for milk, capture contact details, and save the target volume.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6">
+            <form className="space-y-4" onSubmit={handleInquirySubmit}>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Requester Name</label>
+                <input type="text" required value={inquiryForm.requester_name} onChange={(e) => setInquiryForm(prev => ({ ...prev, requester_name: e.target.value }))} placeholder="e.g. Maria Santos" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Contact Details</label>
+                <input type="text" required value={inquiryForm.contact_info} onChange={(e) => setInquiryForm(prev => ({ ...prev, contact_info: e.target.value }))} placeholder="Phone, email, or address" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Target Volume (mL)</label>
+                <input type="number" required min="1" value={inquiryForm.required_volume} onChange={(e) => setInquiryForm(prev => ({ ...prev, required_volume: e.target.value }))} placeholder="e.g. 250" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
+              </div>
+              <button type="submit" disabled={isSavingInquiry} className="w-full bg-[#1A1A1A] text-white py-3 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50">
+                {isSavingInquiry ? 'Saving inquiry...' : 'Save Inquiry'}
+              </button>
+            </form>
+
+            <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-slate-800">Recent Intake Requests</h4>
+                <span className="text-[11px] text-slate-500">Latest 10</span>
+              </div>
+              <div className="space-y-2 max-h-[320px] overflow-auto">
+                {inquiries.length === 0 ? (
+                  <div className="text-sm text-slate-500">No inquiries logged yet.</div>
+                ) : (
+                  inquiries.map((item) => (
+                    <div key={item.inquiry_id} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="flex justify-between gap-3 items-start">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{item.requester_name}</p>
+                          <p className="text-xs text-slate-500 mt-1">{item.contact_info}</p>
+                        </div>
+                        <span className="text-xs font-bold text-[#E04A75]">{item.required_volume} mL</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-2 text-[11px] text-slate-500">
+                        <span>{item.status}</span>
+                        <span>{new Date(item.created_at || item.timestamp || Date.now()).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       {/* SHOW PRINT MODAL IF TRIGGERED */}

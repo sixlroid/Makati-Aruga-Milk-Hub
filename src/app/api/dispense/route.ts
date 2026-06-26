@@ -6,8 +6,13 @@ const prisma = new PrismaClient();
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { mtn, volume, hospital, bottleType, cost } = data;
+    const { mtn, volume, hospital, bottleType } = data;
     const dispenseVol = parseInt(volume);
+    const RATE_PER_ML = 2.0;
+    const BOTTLE_DEPOSIT = 50;
+    const baseFee = hospital === 'outside_makati' ? dispenseVol * RATE_PER_ML : 0;
+    const depositFee = hospital === 'outside_makati' ? BOTTLE_DEPOSIT : 0;
+    const totalFee = baseFee + depositFee;
 
     // 1. Verify the Receiver profile exists
     const receiver = await prisma.member_Profiles.findUnique({
@@ -46,9 +51,9 @@ export async function POST(request: Request) {
           receiver_id: receiver.member_id,
           dispensed_vol: dispenseVol,
           batch_id: availableBatch.batch_id, // NO MORE HARDCODED BATCH ID!
-          base_fee: cost,
-          deposit_fee: 0,
-          total_fee: cost,
+          base_fee: baseFee,
+          deposit_fee: depositFee,
+          total_fee: totalFee,
           processed_by: 2, // (Note: We keep Nurse ID 2 until we connect the NextAuth login system!)
         }
       })
