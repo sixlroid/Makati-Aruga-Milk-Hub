@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { assignMissingMemberIdentifiers } from '@/lib/identifiers';
 
 const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { mtn, volume, hospital, bottleType } = data;
-    const dispenseVol = parseInt(volume);
+    const { mtn, volume, hospital, bottleType, cost } = data;
+    const dispenseVol = parseInt(volume, 10);
     const RATE_PER_ML = 2.0;
     const BOTTLE_DEPOSIT = 50;
     const baseFee = hospital === 'outside_makati' ? dispenseVol * RATE_PER_ML : 0;
@@ -16,11 +17,15 @@ export async function POST(request: Request) {
 
     // 1. Verify the Receiver profile exists
     const receiver = await prisma.member_Profiles.findUnique({
-      where: { tracking_no: mtn.toUpperCase() }
+      where: { tracking_no: mtn.toUpperCase().trim() }
     });
 
     if (!receiver) {
       return NextResponse.json({ error: "No profile found matching that Receiver MTN." }, { status: 404 });
+    }
+
+    if (!receiver.rtn || !receiver.dtn) {
+      await assignMissingMemberIdentifiers(receiver.member_id, prisma);
     }
 
     // 2. NEW: Find an available Pasteurized Batch with enough volume! (FIFO Strategy)

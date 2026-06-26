@@ -13,6 +13,12 @@ type MemberProfile = {
   phone_number?: string;
   status: string;
   medical_docs?: string | null;
+  last_screening_at?: string | null;
+  screening_valid_until?: string | null;
+  screening_valid?: boolean;
+  screening_expired?: boolean;
+  eligible_to_donate?: boolean;
+  has_previous_donations?: boolean;
 };
 
 type HistoryItem = {
@@ -33,6 +39,15 @@ export default function MemberDashboard() {
   const [saving, setSaving] = useState(false);
   const [workerLoading, setWorkerLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [donationMessage, setDonationMessage] = useState<string | null>(null);
+  const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [donationSubmitting, setDonationSubmitting] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [donationVolume, setDonationVolume] = useState('');
+  const [donationSource, setDonationSource] = useState('Scheduled donation');
+  const [confirmNoNewRisks, setConfirmNoNewRisks] = useState(false);
+  const [requestVolume, setRequestVolume] = useState('');
+  const [requestHospital, setRequestHospital] = useState('');
   const [formState, setFormState] = useState({
     first_name: '',
     last_name: '',
@@ -130,6 +145,73 @@ export default function MemberDashboard() {
       setMessage('Identifier refresh failed.');
     } finally {
       setWorkerLoading(false);
+    }
+  };
+
+  const handleScheduleDonation = async (event: FormEvent) => {
+    event.preventDefault();
+    setDonationSubmitting(true);
+    setDonationMessage(null);
+
+    try {
+      const res = await fetch('/api/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mtn: activeMtn,
+          volume: donationVolume,
+          source: donationSource,
+          confirm_no_new_risks: confirmNoNewRisks
+        })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        await fetchMemberData(activeMtn);
+        setDonationMessage(data.message ?? 'Donation appointment scheduled.');
+        setDonationVolume('');
+      } else {
+        setDonationMessage(data.error ?? 'Unable to schedule donation.');
+      }
+    } catch (error) {
+      console.error('Donation scheduling failed', error);
+      setDonationMessage('Unable to schedule donation.');
+    } finally {
+      setDonationSubmitting(false);
+    }
+  };
+
+  const handleRequestMilk = async (event: FormEvent) => {
+    event.preventDefault();
+    setRequestSubmitting(true);
+    setRequestMessage(null);
+
+    try {
+      const res = await fetch('/api/dispense', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mtn: activeMtn,
+          volume: requestVolume,
+          hospital: requestHospital,
+          cost: 0
+        })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        await fetchMemberData(activeMtn);
+        setRequestMessage(data.message ?? 'Milk request submitted.');
+        setRequestVolume('');
+        setRequestHospital('');
+      } else {
+        setRequestMessage(data.error ?? 'Unable to submit milk request.');
+      }
+    } catch (error) {
+      console.error('Milk request failed', error);
+      setRequestMessage('Unable to submit milk request.');
+    } finally {
+      setRequestSubmitting(false);
     }
   };
 
@@ -288,6 +370,123 @@ export default function MemberDashboard() {
                   </button>
                 </form>
               </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Health Screening Status</h2>
+                    <p className="text-xs text-slate-500 mt-1">Approved screenings remain valid for 3 months before donation.</p>
+                  </div>
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase ${profile.screening_valid ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
+                    {profile.screening_valid ? 'Valid' : 'Needs renewal'}
+                  </span>
+                </div>
+                <div className="space-y-3 text-sm text-slate-700">
+                  <div><span className="font-semibold">Last screening:</span> {profile.last_screening_at ?? 'Not available'}</div>
+                  <div><span className="font-semibold">Valid until:</span> {profile.screening_valid_until ?? 'N/A'}</div>
+                  <div><span className="font-semibold">Donation eligible:</span> {profile.eligible_to_donate ? 'Yes' : 'No'}</div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="mb-4">
+                  <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Request Milk</h2>
+                  <p className="text-xs text-slate-500 mt-1">Submit a receiver request through the network.</p>
+                </div>
+                {requestMessage ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 mb-4">{requestMessage}</div>
+                ) : null}
+                <form onSubmit={handleRequestMilk} className="space-y-4">
+                  <label className="block text-sm text-slate-600">
+                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Requested volume (mL)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={requestVolume}
+                      onChange={(event) => setRequestVolume(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                      placeholder="e.g. 150"
+                    />
+                  </label>
+                  <label className="block text-sm text-slate-600">
+                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Hospital or destination</span>
+                    <input
+                      type="text"
+                      value={requestHospital}
+                      onChange={(event) => setRequestHospital(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                      placeholder="e.g. Makati Medical Center"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={requestSubmitting}
+                    className="w-full rounded-xl bg-[#E04A75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c83b62] disabled:opacity-60"
+                  >
+                    {requestSubmitting ? 'Submitting…' : 'Request Milk'}
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="mb-4">
+                <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Donate Milk by Appointment</h2>
+                <p className="text-xs text-slate-500 mt-1">Schedule donation appointments only after nurse approval and valid screening.</p>
+              </div>
+              {donationMessage ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 mb-4">{donationMessage}</div>
+              ) : null}
+              <form onSubmit={handleScheduleDonation} className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block text-sm text-slate-600">
+                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Donation volume (mL)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={donationVolume}
+                      onChange={(event) => setDonationVolume(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                      placeholder="e.g. 200"
+                    />
+                  </label>
+                  <label className="block text-sm text-slate-600">
+                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Donation source</span>
+                    <input
+                      type="text"
+                      value={donationSource}
+                      onChange={(event) => setDonationSource(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                      placeholder="Scheduled donation"
+                    />
+                  </label>
+                </div>
+                {profile.has_previous_donations ? (
+                  <label className="flex items-start gap-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={confirmNoNewRisks}
+                      onChange={(event) => setConfirmNoNewRisks(event.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#E04A75]"
+                    />
+                    <span>I confirm that no new health risks have arisen since my last approved screening.</span>
+                  </label>
+                ) : null}
+                <button
+                  type="submit"
+                  disabled={donationSubmitting || !profile.eligible_to_donate}
+                  className="w-full rounded-xl bg-[#1A1A1A] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {donationSubmitting ? 'Scheduling…' : 'Schedule Donation'}
+                </button>
+                {!profile.eligible_to_donate ? (
+                  <p className="text-xs text-amber-600">Donations are only available after nurse approval and with a screening valid within the last 3 months.</p>
+                ) : null}
+              </form>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

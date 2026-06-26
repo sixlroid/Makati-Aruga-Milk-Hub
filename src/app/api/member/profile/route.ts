@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { assignMissingMemberIdentifiers } from '@/lib/identifiers';
 
 const prisma = new PrismaClient();
 
@@ -34,13 +33,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No member profile found.' }, { status: 404 });
     }
 
-    const withIdentifiers = await assignMissingMemberIdentifiers(member.member_id, prisma);
     const history = await prisma.raw_Collections.findMany({
       where: { donor_id: member.member_id },
       orderBy: { date_collected: 'desc' }
     });
 
-    return NextResponse.json({ member: withIdentifiers, history }, { status: 200 });
+    const latestScreening = await prisma.health_Screenings.findFirst({
+      where: { member_id: member.member_id },
+      orderBy: { created_at: 'desc' }
+    });
+
+    const screeningValidUntil = latestScreening
+      ? new Date(latestScreening.created_at.getTime() + 90 * 24 * 60 * 60 * 1000)
+      : null;
+
+    const screeningValid = screeningValidUntil ? screeningValidUntil > new Date() : false;
+
+    return NextResponse.json({
+      member: {
+        ...member,
+        last_screening_at: latestScreening?.created_at.toISOString() ?? null,
+        screening_valid_until: screeningValidUntil?.toISOString() ?? null,
+        screening_valid: screeningValid,
+        screening_expired: !!latestScreening && !screeningValid,
+        eligible_to_donate: member.status === 'Approved' && screeningValid,
+        has_previous_donations: history.length > 0
+      },
+      history
+    }, { status: 200 });
   } catch (error) {
     console.error('MEMBER PORTAL API ERROR:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -74,9 +94,7 @@ export async function PATCH(request: Request) {
       }
     });
 
-    const withIdentifiers = await assignMissingMemberIdentifiers(updatedMember.member_id, prisma);
-
-    return NextResponse.json({ member: withIdentifiers }, { status: 200 });
+    return NextResponse.json({ member: updatedMember }, { status: 200 });
   } catch (error) {
     console.error('MEMBER PROFILE UPDATE ERROR:', error);
     return NextResponse.json({ error: 'Unable to update profile.' }, { status: 500 });
