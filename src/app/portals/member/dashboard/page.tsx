@@ -24,8 +24,8 @@ type HistoryItem = {
 };
 
 export default function MemberDashboard() {
-  const [inputMtn, setInputMtn] = useState('MTN-644013');
-  const [activeMtn, setActiveMtn] = useState('MTN-644013');
+  const [inputMtn, setInputMtn] = useState('MID-644013');
+  const [activeMtn, setActiveMtn] = useState('MID-644013');
 
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);

@@ -151,7 +151,7 @@ export default function NurseDashboard() {
             <form className="space-y-5 flex-1 flex flex-col" onSubmit={handleLogDonation}>
               <div>
                 <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Select Donor Profile (MTN)</label>
-                <input type="text" required value={donorMtn} onChange={(e) => setDonorMtn(e.target.value)} placeholder="e.g. MTN-1024" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75] uppercase" />
+                <input type="text" required value={donorMtn} onChange={(e) => setDonorMtn(e.target.value)} placeholder="e.g. MID-1024" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75] uppercase" />
               </div>
               <div className="flex gap-4">
                 <div className="w-1/2">
@@ -186,7 +186,7 @@ export default function NurseDashboard() {
               <div className="flex gap-4">
                 <div className="w-1/2">
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Receiver Account (MTN)</label>
-                  <input type="text" required value={receiverMtn} onChange={(e) => setReceiverMtn(e.target.value)} placeholder="e.g. MTN-7001" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75] uppercase" />
+                  <input type="text" required value={receiverMtn} onChange={(e) => setReceiverMtn(e.target.value)} placeholder="e.g. MID-7001" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75] uppercase" />
                 </div>
                 <div className="w-1/2">
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Volume to Release (mL)</label>

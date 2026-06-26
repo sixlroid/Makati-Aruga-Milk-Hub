@@ -12,6 +12,7 @@ export default function PublicGateway() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastName, setLastName] = useState('');
   const [middleInitial, setMiddleInitial] = useState('');
   const [dob, setDob] = useState('');
@@ -22,60 +23,114 @@ export default function PublicGateway() {
   const [loginId, setLoginId] = useState('');
   const router = useRouter();
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const sanitizeDigits = (value: string) => value.replace(/\D/g, '').slice(0, 11);
+  const sanitizeLetters = (value: string) => value.replace(/[^A-Za-z]/g, '').slice(0, 2);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (activeTab === 'login') {
-      const res = await signIn('credentials', {
-        redirect: false,
-        username: loginId,
-        password: password,
-      });
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-      if (res?.error) {
-        alert('Invalid credentials. Please try again.');
+    try {
+      if (activeTab === 'login') {
+        const res = await signIn('credentials', {
+          redirect: false,
+          username: loginId,
+          password,
+        });
+
+        if (!res?.ok || res?.error) {
+          alert('Invalid credentials. Please try again.');
+          return;
+        }
+
+        router.refresh();
+
+        let session = await getSession();
+        for (let attempt = 0; attempt < 3 && !session?.user; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          session = await getSession();
+        }
+
+        const userRole = (session?.user as any)?.role;
+
+        if (userRole === 'nurse') router.push('/portals/nurse/dashboard');
+        else if (userRole === 'admin') router.push('/portals/admin/dashboard');
+        else if (userRole === 'lab') router.push('/portals/lab/dashboard');
+        else router.push('/portals/member/dashboard');
+
         return;
       }
 
-      const session = await getSession();
-      const userRole = (session?.user as any)?.role;
+      const trimmedFirstName = firstName.trim();
+      const trimmedLastName = lastName.trim();
+      const trimmedMiddleInitial = middleInitial.trim();
+      const trimmedDob = dob.trim();
+      const trimmedEthnicity = ethnicity.trim();
+      const trimmedPhone = phone.trim();
+      const trimmedStatus = status.trim();
+      const trimmedPassword = password.trim();
+      const trimmedEmail = email.trim();
+      const trimmedInfoSource = infoSource.trim();
+      const trimmedProvidedId = providedId.trim();
 
-      if (userRole === 'nurse') router.push('/portals/nurse/dashboard');
-      else if (userRole === 'admin') router.push('/portals/admin/dashboard');
-      else if (userRole === 'lab') router.push('/portals/lab/dashboard');
-      else router.push('/portals/member/dashboard');
+      if (!trimmedFirstName || !trimmedLastName || !trimmedDob || !trimmedStatus || !trimmedEthnicity || !trimmedPhone || !trimmedPassword) {
+        alert('Please complete all required registration fields.');
+        return;
+      }
 
-      return;
-    }
+      if (!/^\d{11}$/.test(trimmedPhone)) {
+        alert('Phone number must be exactly 11 digits.');
+        return;
+      }
 
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        role,
-        phone,
-        email,
-        password,
-        firstName,
-        lastName,
-        middleInitial,
-        dob,
-        ethnicity,
-        status,
-        infoSource,
-        providedTrackingId: providedId,
-      }),
-    });
+      if (trimmedMiddleInitial && !/^[A-Za-z]{1,2}$/.test(trimmedMiddleInitial)) {
+        alert('Middle initial may only contain letters.');
+        return;
+      }
 
-    const data = await response.json();
+      if (role.startsWith('member')) {
+        if (!trimmedInfoSource) {
+          alert('How did you hear about us is required.');
+          return;
+        }
+      } else if (!trimmedEmail || !trimmedProvidedId) {
+        alert('Staff registration requires an email address and staff ID.');
+        return;
+      }
 
-    if (response.ok) {
-      alert('Registration successful! You can now log in.');
-      setActiveTab('login');
-      setLoginId(email || phone);
-      setPassword('');
-    } else {
-      alert('Registration failed: ' + (data.error || 'Unknown error'));
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role,
+          phone: trimmedPhone,
+          email: trimmedEmail,
+          password: trimmedPassword,
+          firstName: trimmedFirstName,
+          lastName: trimmedLastName,
+          middleInitial: trimmedMiddleInitial,
+          dob: trimmedDob,
+          ethnicity: trimmedEthnicity,
+          status: trimmedStatus,
+          infoSource: trimmedInfoSource,
+          providedTrackingId: trimmedProvidedId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Registration successful! You can now log in.');
+        setActiveTab('login');
+        setLoginId(email || phone);
+        setPassword('');
+      } else {
+        alert('Registration failed: ' + (data.error || 'Unknown error'));
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -249,7 +304,7 @@ export default function PublicGateway() {
                 </div>
               </div>
 
-              <form className="space-y-4" onSubmit={handleRegister}>
+              <form className="space-y-4" onSubmit={handleSubmit}>
                 {activeTab === 'login' ? (
                   <>
                     <div>
@@ -258,7 +313,7 @@ export default function PublicGateway() {
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 09171234567 or MTN-1024"
+                        placeholder="e.g. you@example.com or 09171234567"
                         value={loginId}
                         onChange={(e) => setLoginId(e.target.value)}
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-rose-300 focus:bg-white focus:ring-4 focus:ring-rose-100"
@@ -313,7 +368,7 @@ export default function PublicGateway() {
                         type="text"
                         placeholder="M.I."
                         value={middleInitial}
-                        onChange={(e) => setMiddleInitial(e.target.value)}
+                        onChange={(e) => setMiddleInitial(sanitizeLetters(e.target.value))}
                         className="w-1/5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-rose-300 focus:bg-white focus:ring-4 focus:ring-rose-100"
                         maxLength={2}
                       />
@@ -359,7 +414,7 @@ export default function PublicGateway() {
                         type="tel"
                         placeholder="Phone Number"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(sanitizeDigits(e.target.value))}
                         className="w-1/2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-rose-300 focus:bg-white focus:ring-4 focus:ring-rose-100"
                         required
                       />
@@ -402,7 +457,7 @@ export default function PublicGateway() {
                         />
                         <input
                           type="text"
-                          placeholder="Provided Staff ID (e.g. NMTN-1024)"
+                          placeholder="Provided Staff ID (e.g. NID-1024)"
                           value={providedId}
                           onChange={(e) => setProvidedId(e.target.value)}
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-rose-300 focus:bg-white focus:ring-4 focus:ring-rose-100"
@@ -424,9 +479,14 @@ export default function PublicGateway() {
 
                 <button
                   type="submit"
-                  className="mt-4 w-full rounded-2xl bg-[#E04A75] px-4 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#C93660] focus:outline-none focus:ring-4 focus:ring-rose-200"
+                  disabled={isSubmitting}
+                  className="mt-4 w-full rounded-2xl bg-[#E04A75] px-4 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#C93660] focus:outline-none focus:ring-4 focus:ring-rose-200 disabled:cursor-not-allowed disabled:bg-rose-300"
                 >
-                  {activeTab === 'login' ? 'Login' : 'Agree & Register'}
+                  {isSubmitting
+                    ? 'Please wait...'
+                    : activeTab === 'login'
+                      ? 'Login'
+                      : 'Agree & Register'}
                 </button>
               </form>
 

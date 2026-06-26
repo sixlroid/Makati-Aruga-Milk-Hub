@@ -138,7 +138,7 @@ export default function NewHealthScreening() {
             </div>
             <div className="p-6">
               <div className="max-w-md">
-                <input type="text" required value={mtn} onChange={(e) => setMtn(e.target.value)} placeholder="e.g. MTN-1024" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm font-bold placeholder-slate-400 focus:border-[#E04A75] uppercase text-slate-800" />
+                <input type="text" required value={mtn} onChange={(e) => setMtn(e.target.value)} placeholder="e.g. MID-1024" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm font-bold placeholder-slate-400 focus:border-[#E04A75] uppercase text-slate-800" />
               </div>
             </div>
           </div>

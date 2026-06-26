@@ -16,30 +16,41 @@ const handler = NextAuth({
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
 
-        // 1. Find the user by Email OR Tracking Number OR Phone Number
+        const normalizedInput = credentials.username.trim();
+        const lookupValue = normalizedInput.toLowerCase();
+
         const user = await prisma.users.findFirst({
           where: {
             OR: [
-              { email: credentials.username },
-              { Member_Profile: { tracking_no: credentials.username } },
-              { Staff_Profile: { tracking_no: credentials.username } },
-              { Member_Profile: { phone_number: credentials.username } }
+              { email: normalizedInput },
+              { email: { equals: lookupValue, mode: 'insensitive' } },
+              { Member_Profile: { phone_number: normalizedInput } },
+              { Staff_Profile: { phone_number: normalizedInput } },
+              { Member_Profile: { tracking_no: normalizedInput } },
+              { Staff_Profile: { tracking_no: normalizedInput } }
             ]
+          },
+          include: {
+            Member_Profile: { select: { status: true } },
+            Staff_Profile: { select: { status: true } }
           }
         });
 
         if (!user) throw new Error("User not found");
 
-        // 2. Check the password (raw check for now, you can upgrade to bcrypt later)
+        const profileStatus = user.Member_Profile?.status ?? user.Staff_Profile?.status;
+        if (profileStatus === "Inactive") {
+          throw new Error("Account is inactive");
+        }
+
         if (user.password !== credentials.password) {
           throw new Error("Invalid password");
         }
 
-        // 3. Return the user payload to the session
         return {
           id: user.user_id.toString(),
           email: user.email,
-          role: user.role, 
+          role: user.role,
         };
       }
     })
