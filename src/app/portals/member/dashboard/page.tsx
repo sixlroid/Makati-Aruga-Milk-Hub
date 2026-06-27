@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
+import { useSession } from 'next-auth/react';
 
 type MemberProfile = {
   member_id: number;
@@ -30,8 +31,8 @@ type HistoryItem = {
 };
 
 export default function MemberDashboard() {
-  const [inputMtn, setInputMtn] = useState('MID-644013');
-  const [activeMtn, setActiveMtn] = useState('MID-644013');
+  const { data: session, status } = useSession();
+  const activeMtn = session?.user?.name as string | undefined;
 
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -87,8 +88,11 @@ export default function MemberDashboard() {
   };
 
   useEffect(() => {
-    fetchMemberData(activeMtn);
-  }, [activeMtn]);
+    if (status === "loading") return;
+    if (status === "authenticated" && activeMtn) {
+      fetchMemberData(activeMtn);
+    }
+  }, [status, activeMtn]);
 
   const totalVolumeDonated = history.reduce((sum, item) => sum + item.raw_volume_ml, 0);
 
@@ -135,7 +139,7 @@ export default function MemberDashboard() {
       const data = await res.json();
 
       if (res.ok) {
-        await fetchMemberData(activeMtn);
+        await fetchMemberData(activeMtn || '');
         setMessage(data.message ?? 'Identifiers refreshed.');
       } else {
         setMessage(data.error ?? 'Unable to refresh identifiers.');
@@ -167,7 +171,7 @@ export default function MemberDashboard() {
       const data = await res.json();
 
       if (res.ok) {
-        await fetchMemberData(activeMtn);
+        await fetchMemberData(activeMtn || '');
         setDonationMessage(data.message ?? 'Donation appointment scheduled.');
         setDonationVolume('');
       } else {
@@ -200,7 +204,7 @@ export default function MemberDashboard() {
       const data = await res.json();
 
       if (res.ok) {
-        await fetchMemberData(activeMtn);
+        await fetchMemberData(activeMtn || '');
         setRequestMessage(data.message ?? 'Milk request submitted.');
         setRequestVolume('');
         setRequestHospital('');
@@ -242,25 +246,6 @@ export default function MemberDashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm md:col-span-2 flex items-center justify-between relative overflow-hidden">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Clinical Clearance Status</span>
-                  <div className="text-xl font-black text-slate-800 mt-1 font-heading">
-                    {profile.status === 'Approved' && '✅ Approved for Donation'}
-                    {profile.status === 'Deferred' && '🚫 Quarantined / Deferred'}
-                    {profile.status === 'Single' && '⏳ Profile Pending Review'}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1 max-w-md">
-                    {profile.status === 'Approved' && 'Your medical documentation has been cleared by clinical desk operations. You are certified to distribute raw expressions.'}
-                    {profile.status === 'Deferred' && 'Clinical indicator alerts were raised during your questionnaire evaluation. Active donation status has been paused.'}
-                    {profile.status === 'Single' && 'Your initial file has been successfully staged. Please report to the nurse desk to run an Appendix G-1 physical evaluation loop.'}
-                  </p>
-                </div>
-
-                <div className={`absolute top-0 right-0 h-full w-3 shrink-0 ${
-                  profile.status === 'Approved' ? 'bg-emerald-500' : profile.status === 'Deferred' ? 'bg-red-500' : 'bg-amber-400'
-                }`} />
-              </div>
 
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lifetime Contributions</span>
@@ -274,16 +259,6 @@ export default function MemberDashboard() {
                 <div>
                   <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Interactive Profile & Identity Settings Desk</h2>
                   <p className="text-xs text-slate-500 mt-1">Update your display identity, channel contact target, and validation documentation reference safely.</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleGenerateIdentifiers}
-                    disabled={workerLoading}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                  >
-                    {workerLoading ? 'Working…' : 'Refresh Identifiers'}
-                  </button>
                 </div>
               </div>
 
@@ -373,8 +348,13 @@ export default function MemberDashboard() {
             </div>
 
             <div className="grid gap-4 xl:grid-cols-2">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between gap-4 mb-4">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                {/* Visual Side Border based on overarching profile status */}
+                <div className={`absolute top-0 left-0 h-full w-1.5 shrink-0 ${
+                  profile.status === 'Approved' ? 'bg-emerald-500' : profile.status === 'Deferred' ? 'bg-red-500' : 'bg-amber-400'
+                }`} />
+                
+                <div className="flex items-center justify-between gap-4 mb-4 pl-3">
                   <div>
                     <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Health Screening Status</h2>
                     <p className="text-xs text-slate-500 mt-1">Approved screenings remain valid for 3 months before donation.</p>
@@ -383,10 +363,19 @@ export default function MemberDashboard() {
                     {profile.screening_valid ? 'Valid' : 'Needs renewal'}
                   </span>
                 </div>
-                <div className="space-y-3 text-sm text-slate-700">
-                  <div><span className="font-semibold">Last screening:</span> {profile.last_screening_at ?? 'Not available'}</div>
-                  <div><span className="font-semibold">Valid until:</span> {profile.screening_valid_until ?? 'N/A'}</div>
-                  <div><span className="font-semibold">Donation eligible:</span> {profile.eligible_to_donate ? 'Yes' : 'No'}</div>
+                
+                <div className="space-y-3 text-sm text-slate-700 pl-3">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <span className="font-semibold w-1/3">Clinical File:</span> 
+                    <span className={`font-bold ${profile.status === 'Approved' ? 'text-emerald-600' : profile.status === 'Deferred' ? 'text-red-600' : 'text-amber-600'}`}>
+                      {profile.status === 'Approved' && '✅ Approved'}
+                      {profile.status === 'Deferred' && '🚫 Deferred'}
+                      {profile.status === 'Single' && '⏳ Pending Review'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2"><span className="font-semibold w-1/3">Last check:</span> {profile.last_screening_at ? new Date(profile.last_screening_at).toLocaleDateString('en-GB') : 'Not available'}</div>
+                  <div className="flex items-center gap-2"><span className="font-semibold w-1/3">Valid until:</span> {profile.screening_valid_until ? new Date(profile.screening_valid_until).toLocaleDateString('en-GB') : 'N/A'}</div>
+                  <div className="flex items-center gap-2 pt-2"><span className="font-semibold w-1/3">Donation eligible:</span> {profile.eligible_to_donate ? <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs font-bold">Yes</span> : <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-xs font-bold">No</span>}</div>
                 </div>
               </div>
 

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { assignMissingMemberIdentifiers } from '@/lib/identifiers';
 
 const prisma = new PrismaClient();
 
@@ -55,7 +54,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Please confirm that no new health risks have emerged since your last screening.' }, { status: 403 });
     }
 
-    await assignMissingMemberIdentifiers(member.member_id, prisma);
+    if (!member.dtn) {
+      const randomNumbers = Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join('');
+      const newDtn = `DTN-${randomNumbers}`;
+      
+      await prisma.member_Profiles.update({
+        where: { member_id: member.member_id },
+        data: { dtn: newDtn }
+      });
+    }
 
     await prisma.raw_Collections.create({
       data: {

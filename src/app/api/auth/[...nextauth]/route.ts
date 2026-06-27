@@ -1,9 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
+//import { prisma } from "@/lib/prisma"; // 👈 Using your safe global connection!
+import { prisma } from "../../../../lib/prisma";
 const handler = NextAuth({
   session: { strategy: "jwt" },
   providers: [
@@ -31,8 +29,9 @@ const handler = NextAuth({
             ]
           },
           include: {
-            Member_Profile: { select: { status: true } },
-            Staff_Profile: { select: { status: true } }
+            // 👈 NEW: We explicitly tell Prisma to fetch the tracking numbers
+            Member_Profile: { select: { status: true, tracking_no: true } }, 
+            Staff_Profile: { select: { status: true, tracking_no: true } }
           }
         });
 
@@ -47,16 +46,19 @@ const handler = NextAuth({
           throw new Error("Invalid password");
         }
 
+        // 👈 NEW: Extract the tracking number depending on if they are a Member or Staff
+        const userTrackingNumber = user.Member_Profile?.tracking_no ?? user.Staff_Profile?.tracking_no;
+
         return {
           id: user.user_id.toString(),
           email: user.email,
           role: user.role,
+          name: userTrackingNumber, // 👈 NEW: Attaches the MTN to the session name!
         };
       }
     })
   ],
   callbacks: {
-    // Pass the role into the token so the frontend knows who is logged in
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as any).role;
@@ -71,7 +73,7 @@ const handler = NextAuth({
     }
   },
   pages: {
-    signIn: "/", // If they fail, keep them on the homepage
+    signIn: "/", 
   }
 });
 

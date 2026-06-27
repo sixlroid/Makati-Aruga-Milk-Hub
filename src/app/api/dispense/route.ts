@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { assignMissingMemberIdentifiers } from '@/lib/identifiers';
 
 const prisma = new PrismaClient();
 
@@ -24,8 +23,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No profile found matching that Receiver MTN." }, { status: 404 });
     }
 
-    if (!receiver.rtn || !receiver.dtn) {
-      await assignMissingMemberIdentifiers(receiver.member_id, prisma);
+    if (!receiver.rtn) {
+      const randomNumbers = Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join('');
+      const newRtn = `RTN-${randomNumbers}`;
+      
+      await prisma.member_Profiles.update({
+        where: { member_id: receiver.member_id },
+        data: { rtn: newRtn }
+      });
     }
 
     // 2. NEW: Find an available Pasteurized Batch with enough volume! (FIFO Strategy)
