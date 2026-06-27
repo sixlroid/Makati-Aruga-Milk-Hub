@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import MilkLabelModal from '@/components/MilkLabelModal';
+import LogoutButton from '@/components/LogoutButton';
 
 export default function LabDashboard() {
   const [stats, setStats] = useState({
@@ -116,11 +117,9 @@ export default function LabDashboard() {
             <h1 className="text-3xl font-bold text-slate-800 font-heading">Laboratory & Pasteurization</h1>
             <p className="text-sm text-slate-500 mt-1">Run selective pipelines, verify biological assays, and clear safe milk assets.</p>
           </div>
-          <Link href="/portals/nurse/dashboard">
-            <button className="bg-slate-200 text-slate-700 px-6 py-3 rounded-lg font-bold text-sm hover:bg-slate-300 transition-colors shadow-sm">
-              Switch to Nurse Station ↱
-            </button>
-          </Link>
+          <div className="shrink-0">
+            <LogoutButton />
+          </div>
         </div>
 
         {/* SUMMARY CARDS */}

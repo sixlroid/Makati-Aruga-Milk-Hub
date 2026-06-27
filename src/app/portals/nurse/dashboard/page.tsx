@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import MilkLabelModal from '@/components/MilkLabelModal';
+import LogoutButton from '@/components/LogoutButton';
+import { LINE_BREAK } from 'html2canvas/dist/types/css/property-descriptors/line-break';
 
 export default function NurseDashboard() {
   // --- STATS STATE ---
@@ -162,6 +164,9 @@ export default function NurseDashboard() {
             <button className="bg-[#1A1A1A] text-white px-6 py-3 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors shadow-sm">
               + Conduct Health Screening
             </button>
+            <div className="shrink-0">
+              <LogoutButton />
+            </div>
           </Link>
         </div>
 

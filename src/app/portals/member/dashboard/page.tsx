@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useSession } from 'next-auth/react';
+import LogoutButton from '@/components/LogoutButton';
 
 type MemberProfile = {
   member_id: number;
@@ -239,9 +240,13 @@ export default function MemberDashboard() {
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">Thank you for helping save fragile lives across Makati City neonatal networks.</p>
               </div>
-              <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 font-mono text-center shrink-0">
-                <span className="block text-[9px] uppercase tracking-wider font-black text-slate-400">Your Tracking Code</span>
-                <span className="text-sm font-black text-slate-700">{profile.tracking_no}</span>
+              
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <LogoutButton />
+                <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 font-mono text-center w-full">
+                  <span className="block text-[9px] uppercase tracking-wider font-black text-slate-400">Your Tracking Code</span>
+                  <span className="text-sm font-black text-slate-700">{profile.tracking_no}</span>
+                </div>
               </div>
             </div>
 

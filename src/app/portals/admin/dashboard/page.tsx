@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import LogoutButton from '@/components/LogoutButton';
 
 type Overview = {
   pending_raw_ml: number;
@@ -288,6 +289,9 @@ export default function AdminDashboard() {
             </div>
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               <span className="font-semibold">{overview.active_accounts}</span> active accounts • <span className="font-semibold">{overview.inactive_accounts}</span> inactive
+            </div>
+            <div className="shrink-0">
+              <LogoutButton />
             </div>
           </div>
         </div>
