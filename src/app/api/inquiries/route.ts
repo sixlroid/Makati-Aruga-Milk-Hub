@@ -1,46 +1,61 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { getToken } from 'next-auth/jwt';
 
 export async function GET() {
   try {
     const inquiries = await prisma.inquiries.findMany({
-      orderBy: { inquiry_id: 'desc' },
-      take: 10,
+      orderBy: { created_at: 'desc' },
+      take: 15 // Pull the 15 most recent
     });
-
     return NextResponse.json(inquiries, { status: 200 });
   } catch (error) {
-    console.error('INQUIRIES GET ERROR:', error);
-    return NextResponse.json({ error: 'Unable to load inquiries.' }, { status: 500 });
+    console.error("INQUIRY FETCH ERROR:", error);
+    return NextResponse.json({ error: "Failed to fetch inquiries" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const requesterName = (data.requester_name || '').toString().trim();
-    const contactInfo = (data.contact_info || '').toString().trim();
-    const requiredVolume = Number(data.required_volume || 0);
+    
+    // Grab the logged-in nurse (default to 2 if testing without auth)
+    const token = await getToken({ req: request as any });
+    const nurseId = token?.sub ? Number(token.sub) : 2;
 
-    if (!requesterName || !contactInfo || !requiredVolume || requiredVolume <= 0) {
-      return NextResponse.json({ error: 'Requester name, contact details, and target volume are required.' }, { status: 400 });
-    }
-
-    const inquiry = await prisma.inquiries.create({
+    const newInquiry = await prisma.inquiries.create({
       data: {
-        requester_name: requesterName,
-        contact_info: contactInfo,
-        required_volume: requiredVolume,
+        requester_name: data.requester_name,
+        contact_info: data.contact_info,
+        member_mtn: data.member_mtn || null, // Optional MTN link
+        inquiry_type: data.inquiry_type,
+        priority: data.priority,
+        // Only save volume and program details if they are actually requesting milk
+        required_volume: data.inquiry_type === 'Request Milk' && data.required_volume ? Number(data.required_volume) : null,
+        infant_gender: data.inquiry_type === 'Request Milk' ? data.infant_gender : null,
+        dispensing_program: data.inquiry_type === 'Request Milk' ? data.dispensing_program : null,
         status: 'Pending',
-        logged_by: 2,
-      },
+        logged_by: nurseId
+      }
     });
 
-    return NextResponse.json({ message: 'Inquiry saved successfully.', inquiry }, { status: 201 });
+    return NextResponse.json({ inquiry: newInquiry }, { status: 201 });
   } catch (error) {
-    console.error('INQUIRIES POST ERROR:', error);
-    return NextResponse.json({ error: 'Unable to save inquiry.' }, { status: 500 });
+    console.error("INQUIRY SUBMIT ERROR:", error);
+    return NextResponse.json({ error: "Failed to save inquiry" }, { status: 500 });
+  }
+}
+
+// Added a PATCH route so the Nurse can mark inquiries as "Resolved"
+export async function PATCH(request: Request) {
+  try {
+    const { inquiry_id, status } = await request.json();
+    const updatedInquiry = await prisma.inquiries.update({
+      where: { inquiry_id: Number(inquiry_id) },
+      data: { status }
+    });
+    return NextResponse.json({ inquiry: updatedInquiry }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update inquiry status" }, { status: 500 });
   }
 }

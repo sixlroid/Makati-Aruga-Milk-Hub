@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "../../../../lib/prisma"; // Safely using global prisma
 
 export const dynamic = 'force-dynamic';
 
@@ -33,11 +31,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No member profile found.' }, { status: 404 });
     }
 
+    /// FETCH 1: The original Donations ledger
     const history = await prisma.raw_Collections.findMany({
-      where: { donor_id: member.member_id },
+      where: { donor_id: member.member_id }, // <-- Fixed: uses donor_id
       orderBy: { date_collected: 'desc' }
     });
 
+    // FETCH 2: The new Dispensing/Received ledger
+    const receivedMilkHistory = await prisma.transactions.findMany({
+      where: { receiver_id: member.member_id },
+      orderBy: { timestamp: 'desc' } // <-- Fixed: uses timestamp
+    });
+
+    // FETCH 3: The Health Screening status
     const latestScreening = await prisma.health_Screenings.findFirst({
       where: { member_id: member.member_id },
       orderBy: { created_at: 'desc' }
@@ -59,8 +65,10 @@ export async function GET(request: NextRequest) {
         eligible_to_donate: member.status === 'Approved' && screeningValid,
         has_previous_donations: history.length > 0
       },
-      history
+      history, // This sends the donations back to the frontend
+      receivedMilkHistory // This sends the newly acquired milk back to the frontend
     }, { status: 200 });
+
   } catch (error) {
     console.error('MEMBER PORTAL API ERROR:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

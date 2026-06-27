@@ -45,7 +45,17 @@ model Member_Profiles {
 
   tracking_no        String              @unique
   dtn                String?             @unique
-  rtn                String?             @unique
+  rtn                String?
+  rtn_status         String?  
+  rtn_volume         Int?
+  rtn_fee            Float?
+  rtn_hospital       String?
+  rtn_abstract       String?
+  rtn_prescription   String?
+  rtn_remarks        String?
+  rtn_bottle_type        String?
+  rtn_infant_gender      String?
+  rtn_dispensing_program String?
   last_name          String
   first_name         String
   middle_initial     String?
@@ -56,12 +66,17 @@ model Member_Profiles {
   date_of_birth      DateTime
   status             String
   info_source        String
+  last_screening_at      DateTime?
+  screening_valid_until  DateTime?
+  screening_valid        Boolean    @default(false)
+  eligible_to_donate     Boolean    @default(false)
 
   medical_docs       String?
 
   Health_Screenings  Health_Screenings[]
   Raw_Collections    Raw_Collections[]
   Transactions       Transactions[]
+  Donation_Appointments Donation_Appointments[]
 }
 
 model Health_Screenings {
@@ -89,14 +104,27 @@ model Health_Screenings {
 }
 
 model Inquiries {
-  inquiry_id      Int               @id @default(autoincrement())
-  requester_name  String
-  contact_info    String
-  required_volume Int
-  status          String
+  inquiry_id           Int               @id @default(autoincrement())
+  
+  // Core Contact Info
+  requester_name       String
+  contact_info         String
+  member_mtn           String?           
+  
+  // Triage & Categorization
+  inquiry_type         String            @default("Request Milk")
+  priority             String            @default("Standard")
+  status               String            @default("Pending")
+  
+  // Milk Request Specifics
+  required_volume      Int?              
+  infant_gender        String?
+  dispensing_program   String?
 
-  logged_by       Int
-  staff           Staff_Profiles    @relation(fields: [logged_by], references: [staff_id])
+  // System Tracking
+  logged_by            Int
+  staff                Staff_Profiles    @relation(fields: [logged_by], references: [staff_id])
+  created_at           DateTime          @default(now())
 }
 
 model Raw_Collections {
@@ -134,21 +162,18 @@ model Milk_Batches {
 
 model Transactions {
   trans_id        Int               @id @default(autoincrement())
-
+  rtn_reference   String?           
+  
   receiver_id     Int
   receiver        Member_Profiles   @relation(fields: [receiver_id], references: [member_id])
-
   batch_id        Int
   batch           Milk_Batches      @relation(fields: [batch_id], references: [batch_id])
-
   dispensed_vol   Int
   base_fee        Decimal
   deposit_fee     Decimal
   total_fee       Decimal
-
   processed_by    Int
   staff           Staff_Profiles    @relation(fields: [processed_by], references: [staff_id])
-
   timestamp       DateTime          @default(now())
 }
 
@@ -161,4 +186,17 @@ model Audit_Logs {
   action_type     String
   record_affected String
   timestamp       DateTime          @default(now())
+}
+
+model Donation_Appointments {
+  appointment_id    Int             @id @default(autoincrement())
+  
+  donor_id          Int
+  donor             Member_Profiles @relation(fields: [donor_id], references: [member_id])
+
+  appointment_date  DateTime
+  collection_method String
+
+  status            String          @default("Scheduled") 
+  created_at        DateTime        @default(now())
 }
