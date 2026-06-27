@@ -1,108 +1,92 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+// Import your auth options if they live elsewhere: import { authOptions } from "@/lib/auth";
 
-const prisma = new PrismaClient();
-
-// GET: Fetch all independent raw bottles awaiting thermal loops
+// GET: Feed the "Incoming Raw Storage Matrix"
 export async function GET() {
   try {
     const pendingBottles = await prisma.raw_Collections.findMany({
       where: { batch_id: null },
-      include: {
-        donor: { select: { tracking_no: true } }
-      },
+      include: { donor: { select: { tracking_no: true } } },
       orderBy: { date_collected: 'asc' }
     });
     return NextResponse.json(pendingBottles, { status: 200 });
   } catch (error) {
-    console.error("FETCH QUEUE ERROR:", error);
-    return NextResponse.json({ error: "Failed to load bottle queue." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load matrix" }, { status: 500 });
   }
 }
 
-// POST: Process custom arrays with strict thermal parameter validation
+// POST: Handle the "Pasteurize Selected" Button
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    const { ids, temperature, duration } = data;
-
-    // TC-PL-04: Verify system validation for required input fields
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json({ error: "No storage units selected for run entry." }, { status: 400 });
-    }
-    if (!temperature || !duration) {
-      return NextResponse.json({ error: "Fields Required: Temperature and Duration must be specified." }, { status: 400 });
+    // 1. DYNAMIC SESSION GRABBER
+    const session = await getServerSession(); // Pass your auth options here if needed: (request, authOptions)
+    
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ error: "Unauthorized session." }, { status: 401 });
     }
 
-    const tempValue = parseFloat(temperature);
-    const timeValue = parseInt(duration, 10);
-
-    // Fetch only the unprocessed rows out of the target selection
-    const targetBottles = await prisma.raw_Collections.findMany({
-      where: {
-        collection_id: { in: ids },
-        batch_id: null
-      }
+    // Find the physical staff profile attached to the logged-in user's email
+    const staffProfile = await prisma.staff_Profiles.findUnique({
+      where: { email: session.user.email }
     });
 
-    if (targetBottles.length === 0) {
-      return NextResponse.json({ error: "No matching valid unpasteurized targets found." }, { status: 404 });
+    if (!staffProfile) {
+      return NextResponse.json({ error: "Staff profile not found for this session." }, { status: 404 });
     }
 
-    const expiry = new Date();
-    expiry.setMonth(expiry.getMonth() + 6);
-    const results = [];
+    const { ids, temperature, duration } = await request.json();
 
-    // Evaluate Quality Control Parameters
-    let finalStatus = "Pasteurized";
-    let warningFlag = null;
+    const bottles = await prisma.raw_Collections.findMany({
+      where: { collection_id: { in: ids } }
+    });
+    const totalVolume = bottles.reduce((sum, b) => sum + b.raw_volume_ml, 0);
 
-    // TC-PL-02 & TC-PL-03: Sub-optimal temperature or insufficient duration
-    if (tempValue < 62.5 || timeValue < 30) {
-      finalStatus = "Flagged";
-      warningFlag = "Warning: Discard Recommended - Insufficient thermal load.";
-    }
+    const isSubOptimal = parseFloat(temperature) < 62.5 || parseInt(duration) < 30;
 
-    // Loop through each independently to maintain discrete bio-asset boundaries
-    for (const bottle of targetBottles) {
-      const newBatch = await prisma.milk_Batches.create({
+    const newBatch = await prisma.$transaction(async (tx) => {
+      const batch = await tx.milk_Batches.create({
         data: {
-            pooled_volume: bottle.raw_volume_ml,
-            current_volume: bottle.raw_volume_ml,
-            lab_status: finalStatus,
-            expiry_date: expiry,
-            pasteurization_temp: tempValue,
-            pasteurization_time: timeValue,
-            safety_flags: warningFlag,
-            tested_by: 2 // Hardcoded staff ID for now
+          pooled_volume: totalVolume,
+          current_volume: totalVolume,
+          pasteurization_temp: parseFloat(temperature),
+          pasteurization_time: parseInt(duration),
+          lab_status: "Pending",
+          safety_flags: isSubOptimal ? "Sub-optimal thermal process" : null
         }
       });
 
-      await prisma.raw_Collections.update({
-        where: { collection_id: bottle.collection_id },
-        data: { batch_id: newBatch.batch_id }
+      await tx.raw_Collections.updateMany({
+        where: { collection_id: { in: ids } },
+        data: { batch_id: batch.batch_id }
       });
 
-      results.push({
+      // --- DYNAMIC AUDIT LOG ---
+      await tx.audit_Logs.create({
+        data: {
+          staff_id: staffProfile.staff_id, // <--- Uses the dynamically fetched ID!
+          action_type: "CREATE_BATCH",
+          record_affected: `BATCH-${batch.batch_id}`
+        }
+      });
+      // -------------------------
+
+      return batch;
+    });
+
+    return NextResponse.json({ 
+      message: isSubOptimal ? "Discard Recommended." : "Batch pasteurized and sent to QA Desk.",
+      results: {
         batchId: newBatch.batch_id,
-        volume: bottle.raw_volume_ml,
-        status: finalStatus,
-        warning: warningFlag
-      });
-    }
-
-    // Determine the overall response message
-    const responseMessage = warningFlag 
-      ? `System Warning: Discard Recommended for ${results.length} batches.`
-      : `Successfully Pasteurized ${results.length} batches.`;
-
-    return NextResponse.json({
-      message: responseMessage,
-      results
+        volume: newBatch.pooled_volume,
+        temperature: newBatch.pasteurization_temp,
+        duration: newBatch.pasteurization_time
+      }
     }, { status: 201 });
 
   } catch (error) {
-    console.error("PASTEURIZATION EXECUTION ERROR:", error);
-    return NextResponse.json({ error: "Internal Server Error during loop run." }, { status: 500 });
+    console.error("BATCH PROCESSING ERROR:", error);
+    return NextResponse.json({ error: "Failed to process cycle" }, { status: 500 });
   }
 }

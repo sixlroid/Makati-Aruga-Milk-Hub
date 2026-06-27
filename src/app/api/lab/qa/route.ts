@@ -1,44 +1,45 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
-
+// GET: Feed the QA Desk Table
 export async function GET() {
   try {
-    const quarantineBatches = await prisma.milk_Batches.findMany({
-      where: {
-        // Look specifically for the statuses our Logger just created!
-        lab_status: { in: ['Pasteurized', 'Flagged'] } 
-      },
+    const qaBatches = await prisma.milk_Batches.findMany({
+      where: { lab_status: "Pending" }, // Waiting for MBT results
       orderBy: { batch_id: 'asc' }
     });
-    return NextResponse.json(quarantineBatches, { status: 200 });
+    return NextResponse.json(qaBatches, { status: 200 });
   } catch (error) {
-    console.error("QA FETCH ERROR:", error);
-    return NextResponse.json({ error: "Failed to load QA queue." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load QA desk" }, { status: 500 });
   }
 }
 
-// POST: Handle the Lab Tech clicking "Clear" or "Discard"
+// POST: Handle the Pass/Discard Buttons
 export async function POST(request: Request) {
   try {
-    const { batchId, decision } = await request.json();
+    const { batchId, decision } = await request.json(); // 'Passed' or 'Failed'
 
-    if (!batchId || !decision) {
-      return NextResponse.json({ error: "Missing required QA fields." }, { status: 400 });
+    let finalStatus = "Cleared";
+    let expiryDate = new Date();
+    expiryDate.setMonth(expiryDate.getMonth() + 6); // Good for 6 months
+
+    if (decision === "Failed") {
+      finalStatus = "Discarded";
+      expiryDate = new Date(0); 
     }
 
-    // Map the button click to the final database status
-    const newStatus = decision === 'Passed' ? 'Passed' : 'Discarded';
-
-    const updatedBatch = await prisma.milk_Batches.update({
+    await prisma.milk_Batches.update({
       where: { batch_id: batchId },
-      data: { lab_status: newStatus }
+      data: {
+        lab_status: finalStatus,
+        expiry_date: expiryDate
+      }
     });
 
-    return NextResponse.json({ message: `Batch #${batchId} officially marked as ${newStatus}.` }, { status: 200 });
+    return NextResponse.json({ 
+      message: finalStatus === "Cleared" ? "Milk moved to Safe Vault." : "Contaminated batch destroyed." 
+    }, { status: 200 });
   } catch (error) {
-    console.error("QA UPDATE ERROR:", error);
-    return NextResponse.json({ error: "Failed to update QA decision." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to log QA decision" }, { status: 500 });
   }
 }

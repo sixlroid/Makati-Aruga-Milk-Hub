@@ -1,81 +1,63 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { mtn, volume, source, confirm_no_new_risks } = data;
+    const { dtn, volume, source, confirm_no_new_risks } = data;
 
-    if (!mtn) {
-      return NextResponse.json({ error: 'Tracking number is required.' }, { status: 400 });
+    // 1. Safety Check
+    if (!confirm_no_new_risks) {
+      return NextResponse.json({ error: "Nurse must confirm no new health risks." }, { status: 400 });
     }
 
-    if (!volume) {
-      return NextResponse.json({ error: 'Donation volume is required.' }, { status: 400 });
-    }
+    const cleanDtn = dtn.replace(/['"]/g, '').trim().toUpperCase();
 
-    const member = await prisma.member_Profiles.findUnique({
-      where: { tracking_no: mtn.toUpperCase().trim() }
+    // 2. Find the Approved Appointment
+    const appointment = await prisma.donation_Appointments.findUnique({
+      where: { dtn: cleanDtn },
+      include: { donor: true }
     });
 
-    if (!member) {
-      return NextResponse.json({ error: "No donor profile found matching that Tracking Number." }, { status: 404 });
+    if (!appointment) {
+      return NextResponse.json({ error: "Invalid DTN. Ticket not found." }, { status: 404 });
+    }
+    if (appointment.status !== 'Approved') {
+      return NextResponse.json({ error: `Cannot intake milk. Ticket status is: ${appointment.status}` }, { status: 403 });
     }
 
-    // 2. CLINICAL CHECK: Ensure the donor is actually approved to donate!
-    if (member.status !== "Approved") {
-      return NextResponse.json({ 
-        error: `Clinical Reject: This donor is currently marked as '${member.status}'. They must pass a Health Screening first.` 
-      }, { status: 403 });
-    }
-
-    const latestScreening = await prisma.health_Screenings.findFirst({
-      where: { member_id: member.member_id },
-      orderBy: { created_at: 'desc' }
-    });
-
-    if (!latestScreening) {
-      return NextResponse.json({ error: 'Donation requires an approved nurse screening before scheduling a collection.' }, { status: 403 });
-    }
-
-    const screeningExpiry = new Date(latestScreening.created_at.getTime() + 90 * 24 * 60 * 60 * 1000);
-
-    if (screeningExpiry <= new Date()) {
-      return NextResponse.json({ error: 'The nurse screening has expired after 3 months. Please complete a new screening before donating again.' }, { status: 403 });
-    }
-
-    const priorDonations = await prisma.raw_Collections.count({
-      where: { donor_id: member.member_id }
-    });
-
-    if (priorDonations > 0 && !confirm_no_new_risks) {
-      return NextResponse.json({ error: 'Please confirm that no new health risks have emerged since your last screening.' }, { status: 403 });
-    }
-
-    if (!member.dtn) {
-      const randomNumbers = Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join('');
-      const newDtn = `DTN-${randomNumbers}`;
+    // 3. The Intake Transaction (Log milk, close ticket)
+    await prisma.$transaction([
+      // A. Create the Raw Collection in the freezer
+      prisma.raw_Collections.create({
+        data: {
+          dtn_reference: cleanDtn,
+          donor_id: appointment.donor_id,
+          program_source: source,
+          raw_volume_ml: Number(volume),
+        }
+      }),
       
-      await prisma.member_Profiles.update({
-        where: { member_id: member.member_id },
-        data: { dtn: newDtn }
-      });
-    }
+      // B. Mark the Appointment as Completed
+      prisma.donation_Appointments.update({
+        where: { dtn: cleanDtn },
+        data: { status: 'Completed' }
+      }),
 
-    await prisma.raw_Collections.create({
-      data: {
-        donor_id: member.member_id,
-        program_source: source ?? 'Scheduled donation',
-        raw_volume_ml: parseInt(volume, 10)
-      }
-    });
+      // C. Update Member Profile to free them up for future donations
+      prisma.member_Profiles.update({
+        where: { member_id: appointment.donor_id },
+        data: { 
+          dtn: null,   
+          dtn_status: null 
+        }
+      })
+    ]);
 
-    return NextResponse.json({ message: "Donation appointment requested. Raw collection logged and donor identifier generated if needed." }, { status: 201 });
+    return NextResponse.json({ message: "Raw milk successfully logged to cold storage." }, { status: 201 });
 
   } catch (error) {
-    console.error("COLLECTION API ERROR:", error);
-    return NextResponse.json({ error: "Internal Server Error while logging collection." }, { status: 500 });
+    console.error("COLLECTION INTAKE ERROR:", error);
+    return NextResponse.json({ error: "Failed to log raw milk intake." }, { status: 500 });
   }
 }

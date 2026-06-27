@@ -45,6 +45,7 @@ model Member_Profiles {
 
   tracking_no        String              @unique
   dtn                String?             @unique
+  dtn_status         String?
   rtn                String?
   rtn_status         String?  
   rtn_volume         Int?
@@ -129,14 +130,12 @@ model Inquiries {
 
 model Raw_Collections {
   collection_id   Int               @id @default(autoincrement())
-
+  dtn_reference   String?
   donor_id        Int
   donor           Member_Profiles   @relation(fields: [donor_id], references: [member_id])
-
   program_source  String
   raw_volume_ml   Int
   date_collected  DateTime          @default(now())
-
   batch_id        Int?
   batch           Milk_Batches?     @relation(fields: [batch_id], references: [batch_id])
 }
@@ -190,13 +189,13 @@ model Audit_Logs {
 
 model Donation_Appointments {
   appointment_id    Int             @id @default(autoincrement())
-  
+  dtn               String          @unique
   donor_id          Int
   donor             Member_Profiles @relation(fields: [donor_id], references: [member_id])
 
   appointment_date  DateTime
   collection_method String
 
-  status            String          @default("Scheduled") 
+  status            String          @default("Pending") 
   created_at        DateTime        @default(now())
 }
