@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from "../../../../lib/prisma";
 import { formatTrackingNumberForRole } from '@/lib/identifiers';
-
-const prisma = new PrismaClient();
 
 function getDisplayRole(role: string) {
   if (role === 'admin') return 'Administrator';

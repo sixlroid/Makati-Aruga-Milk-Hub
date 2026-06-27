@@ -3,42 +3,42 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// GET: Fetch all milk batches currently quarantined awaiting QA clearance
 export async function GET() {
   try {
-    const quarantinedBatches = await prisma.milk_Batches.findMany({
-      where: { lab_status: 'Pending' },
-      orderBy: { batch_id: 'desc' }
+    const quarantineBatches = await prisma.milk_Batches.findMany({
+      where: {
+        // Look specifically for the statuses our Logger just created!
+        lab_status: { in: ['Pasteurized', 'Flagged'] } 
+      },
+      orderBy: { batch_id: 'asc' }
     });
-    return NextResponse.json(quarantinedBatches, { status: 200 });
+    return NextResponse.json(quarantineBatches, { status: 200 });
   } catch (error) {
     console.error("QA FETCH ERROR:", error);
-    return NextResponse.json({ error: "Failed to load quarantined inventory." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load QA queue." }, { status: 500 });
   }
 }
 
-// POST: Commit the final clinical verdict (Passed or Failed) for a batch
+// POST: Handle the Lab Tech clicking "Clear" or "Discard"
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    const { batchId, decision } = data; // decision is 'Passed' or 'Failed'
+    const { batchId, decision } = await request.json();
 
     if (!batchId || !decision) {
-      return NextResponse.json({ error: "Missing batchId or screening decision text parameters." }, { status: 400 });
+      return NextResponse.json({ error: "Missing required QA fields." }, { status: 400 });
     }
 
-    // Update the batch status
+    // Map the button click to the final database status
+    const newStatus = decision === 'Passed' ? 'Passed' : 'Discarded';
+
     const updatedBatch = await prisma.milk_Batches.update({
-      where: { batch_id: Number(batchId) },
-      data: { lab_status: decision }
+      where: { batch_id: batchId },
+      data: { lab_status: newStatus }
     });
 
-    return NextResponse.json({ 
-      message: `Batch #${batchId} has been officially marked as '${decision}' and updated inside inventory logs.` 
-    }, { status: 200 });
-
+    return NextResponse.json({ message: `Batch #${batchId} officially marked as ${newStatus}.` }, { status: 200 });
   } catch (error) {
-    console.error("QA STATUS SUBMIT ERROR:", error);
-    return NextResponse.json({ error: "Failed to update biological asset status." }, { status: 500 });
+    console.error("QA UPDATE ERROR:", error);
+    return NextResponse.json({ error: "Failed to update QA decision." }, { status: 500 });
   }
 }

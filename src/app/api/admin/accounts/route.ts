@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from "../../../../lib/prisma"; // Adjust this path if needed (e.g., '@/lib/prisma')
 import { formatTrackingNumberForRole } from '@/lib/identifiers';
-
-const prisma = new PrismaClient();
+import { getToken } from 'next-auth/jwt'; // 👈 NEW: Imports the secure token reader
 
 function getDisplayRole(role: string) {
   if (role === 'admin') return 'Administrator';
@@ -91,6 +90,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // 👈 NEW: Read the secure session token to find out WHICH Admin is clicking the button
+    const token = await getToken({ req: request as any });
+    
+    // Security check: Make sure they are actually logged in
+    if (!token || !token.sub) {
+      return NextResponse.json({ error: 'Unauthorized access.' }, { status: 401 });
+    }
+    
+    // The "sub" property of a JWT token holds the user's ID!
+    const adminStaffId = Number(token.sub);
+
     const data = await request.json();
     const { action, userId } = data;
 
@@ -98,6 +108,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request payload.' }, { status: 400 });
     }
 
+    // ==========================================
+    // WORKFLOW 1: DEACTIVATE ACCOUNT
+    // ==========================================
     if (action === 'deactivate') {
       const user = await prisma.users.findUnique({
         where: { user_id: Number(userId) },
@@ -122,12 +135,33 @@ export async function POST(request: Request) {
         });
       }
 
+      // 👈 NEW: Log the Deactivation to the Database dynamically!
+      await prisma.audit_Logs.create({
+        data: {
+          staff_id: adminStaffId,
+          action_type: "Account Deactivation",
+          record_affected: `User ID: ${userId}`
+        }
+      });
+
       return NextResponse.json({ message: 'Account deactivated.' }, { status: 200 });
     }
 
+    // ==========================================
+    // WORKFLOW 2: DELETE ACCOUNT
+    // ==========================================
     await prisma.member_Profiles.deleteMany({ where: { member_id: Number(userId) } });
     await prisma.staff_Profiles.deleteMany({ where: { staff_id: Number(userId) } });
     await prisma.users.delete({ where: { user_id: Number(userId) } });
+
+    // 👈 NEW: Log the Deletion to the Database dynamically!
+    await prisma.audit_Logs.create({
+      data: {
+        staff_id: adminStaffId,
+        action_type: "Account Deletion",
+        record_affected: `User ID: ${userId}`
+      }
+    });
 
     return NextResponse.json({ message: 'Account deleted.' }, { status: 200 });
   } catch (error) {

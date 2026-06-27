@@ -336,7 +336,7 @@ export default function AdminDashboard() {
                   <button
                     key={tab.key}
                     type="button"
-                    onClick={() => setActiveTab(tab.key as 'accounts' | 'donations' | 'releases')}
+                    onClick={() => setActiveTab(tab.key as 'accounts' | 'donations' | 'releases' | 'audit')}
                     className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === tab.key ? 'bg-[#E04A75] text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
                   >
                     {tab.label}

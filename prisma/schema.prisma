@@ -121,6 +121,10 @@ model Milk_Batches {
   lab_status      String            @default("Pending")
   expiry_date     DateTime?
 
+  pasteurization_temp Decimal?
+  pasteurization_time Int?
+  safety_flags        String?       @db.Text
+
   tested_by       Int?
   staff           Staff_Profiles?   @relation(fields: [tested_by], references: [staff_id])
 
