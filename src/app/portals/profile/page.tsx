@@ -10,7 +10,6 @@ export default function UniversalProfilePage() {
   const user = session?.user as any;
   const fullName = user?.fullName || "";
   const email = user?.email || "";
-  const role = user?.role || "member";
 
   // Split name into initial values
   const nameParts = fullName.split(" ");
@@ -25,6 +24,7 @@ export default function UniversalProfilePage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   // Sync state values once NextAuth session asynchronously streams down
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function UniversalProfilePage() {
       setLastName(initialLastName);
       setEmailAddress(email);
     }
-  }, [session]);
+  }, [session, initialFirstName, initialLastName, email]);
 
   // Discard Edits Handler: Flushes changes and reverts back to the original database profile records
   const handleDiscard = () => {
@@ -43,6 +43,7 @@ export default function UniversalProfilePage() {
       setMiddleInitial("");
       setEmailAddress(email);
       setPhoneNumber("");
+      setMessage(null);
     }
   };
 
@@ -50,6 +51,7 @@ export default function UniversalProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setMessage(null);
 
     try {
       const updatedFullName = `${firstName} ${lastName}`.trim();
@@ -83,110 +85,85 @@ export default function UniversalProfilePage() {
         });
       }
 
-      alert("Profile updated successfully in the database!");
+      setMessage("Profile updated successfully in the database!");
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Something went wrong while updating your account details.");
+      setMessage(error.message || "Something went wrong while updating your account details.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-6xl mx-auto p-8 bg-white border border-slate-100 rounded-2xl shadow-sm mt-6">
+    <div className="min-h-screen bg-slate-50 font-body pb-12">
+      <div className="max-w-5xl mx-auto mt-8 px-4">
         
-        <h2 className="text-xl font-extrabold text-[#0f172a] tracking-wide uppercase">UPDATE PROFILE</h2>
-        <p className="text-sm font-medium text-slate-500 mb-8">Update your personal details...</p>
-        
-        <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-8">
-          
-          {/* Left Panel: Core IDs */}
-          <div className="w-full md:w-2/5 bg-slate-50/60 border border-slate-100 rounded-xl p-6 h-fit">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
-              {role.charAt(0).toUpperCase() + role.slice(1)} Core IDs
-            </h3>
-            <div className="space-y-3 text-sm font-bold text-[#0f172a]">
-              <p>Tracking No: <span className="font-normal text-slate-600">{user?.tracking_no || "N/A"}</span></p>
-              <p>Donor Tracking No: <span className="font-normal text-slate-600">N/A</span></p>
-              <p>Receiver Tracking No: <span className="font-normal text-slate-600">N/A</span></p>
-            </div>
-          </div>
-          
-          {/* Right Panel: Dynamic Forms */}
-          <div className="w-full md:w-3/5 space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">First Name</label>
-                <input 
-                  type="text" 
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-pink-400 font-medium shadow-sm transition-colors" 
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Last Name</label>
-                <input 
-                  type="text" 
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-pink-400 font-medium shadow-sm transition-colors" 
-                />
-              </div>
-            </div>
-
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Middle Initial</label>
-              <input 
-                type="text" 
-                value={middleInitial}
-                onChange={(e) => setMiddleInitial(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-pink-400 font-medium shadow-sm transition-colors" 
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Email Address</label>
-                <input 
-                  type="email" 
-                  value={emailAddress}
-                  onChange={(e) => setEmailAddress(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-pink-400 font-medium shadow-sm transition-colors" 
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Phone Number</label>
-                <input 
-                  type="text" 
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-pink-400 font-medium shadow-sm transition-colors" 
-                />
-              </div>
-            </div>
-
-            {/* Controls */}
-            <div className="flex items-center gap-3 pt-4 justify-start">
-              <button 
-                type="button" 
-                onClick={handleDiscard}
-                className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors text-sm shadow-sm"
-              >
-                Discard Edits
-              </button>
-              <button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="px-6 py-2.5 bg-[#DE3D6D] hover:bg-[#c2325c] text-white font-bold rounded-xl transition-colors text-sm shadow-sm disabled:opacity-50"
-              >
-                {isSubmitting ? "Updating..." : "Update Profile"}
-              </button>
+              <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Update Profile</h2>
+              <p className="text-xs text-slate-500 mt-1">Update your personal details.</p>
             </div>
           </div>
+          
+          {message && (
+            <div className={`rounded-xl border px-3 py-2 text-sm ${message.includes('success') ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+              {message}
+            </div>
+          )}
 
-        </form>
+          <div className="grid gap-4 md:grid-cols-2">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm text-slate-600">
+                  <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">First name</span>
+                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+                </label>
+                <label className="text-sm text-slate-600">
+                  <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Last name</span>
+                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+                </label>
+              </div>
+              <label className="block text-sm text-slate-600">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Middle initial</span>
+                <input value={middleInitial} onChange={(e) => setMiddleInitial(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm text-slate-600">
+                  <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Email address</span>
+                  <input type="email" value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="email or contact alias" />
+                </label>
+                <label className="text-sm text-slate-600">
+                  <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Phone number</span>
+                  <input 
+                    type="tel"
+                    value={phoneNumber} 
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))} 
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" 
+                  />
+                </label>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button" 
+                  disabled={isSubmitting}
+                  onClick={handleDiscard}
+                  className="rounded-xl bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors shadow-sm flex-1"
+                >
+                  Discard Edits
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="rounded-xl bg-[#E04A75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c83b62] disabled:opacity-60 transition-colors shadow-sm flex-1"
+                >
+                  {isSubmitting ? 'Saving…' : 'Update Profile'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
       </div>
     </div>
   );

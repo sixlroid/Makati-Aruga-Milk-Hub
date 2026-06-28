@@ -78,11 +78,20 @@ export default function RequestMilkPage() {
         })
       });
       const data = await res.json();
+      
       if (res.ok) {
-        setRequestMessage(data.message ?? 'Milk inventory dispensation allocation request submitted.');
+        // THE FIX: Forcibly override the local profile state to trigger STATE 2 instantly
+        setProfile((prevProfile: any) => ({
+          ...prevProfile,
+          rtn: data.rtn || prevProfile.rtn || 'GENERATING...', // Use API RTN or fallback
+          rtn_status: 'pending' 
+        }));
+        
         setRequestVolume('');
         setRequestHospital('');
-        if (activeMtn) await fetchProfile(activeMtn); // Refresh state to show Pending
+        
+        // Silently fetch the real backend state in the background
+        if (activeMtn) await fetchProfile(activeMtn); 
       } else {
         setRequestMessage(data.error ?? 'Request rejected by routing gate.');
       }

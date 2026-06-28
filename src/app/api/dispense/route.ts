@@ -3,72 +3,46 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const { mtn, volume, rtn, cost } = await request.json();
-    const requiredVol = Number(volume);
+    // 1. Parse the incoming request from the Member Dashboard
+    const { 
+      mtn, 
+      volume, 
+      hospital, 
+      infant_gender, 
+      dispensing_program, 
+      bottle_type, 
+      cost 
+    } = await request.json();
 
-    // 1. Check the Safe Vault for available milk (FIFO sorting by expiry date)
-    const availableBatches = await prisma.milk_Batches.findMany({
-      where: { lab_status: 'Cleared', current_volume: { gt: 0 } },
-      orderBy: { expiry_date: 'asc' } 
-    });
+    // 2. Generate a new Receipt Tracking Number (RTN)
+    const uniqueSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const generatedRtn = `RTN-${Date.now().toString().slice(-5)}${uniqueSuffix}`;
 
-    const totalAvailable = availableBatches.reduce((sum, b) => sum + b.current_volume, 0);
-
-    if (totalAvailable < requiredVol) {
-      return NextResponse.json({ error: `Insufficient safe milk. Vault has ${totalAvailable}mL, but ${requiredVol}mL is requested.` }, { status: 400 });
-    }
-
-    // 2. Process the transaction and deduct volume
-    await prisma.$transaction(async (tx) => {
-      let remainingToFulfill = requiredVol;
-      const member = await tx.member_Profiles.findUnique({ where: { tracking_no: mtn }});
-      
-      // Grab a staff ID to log the transaction (Grabs the active nurse)
-      const activeStaff = await tx.staff_Profiles.findFirst();
-
-      for (const batch of availableBatches) {
-        if (remainingToFulfill <= 0) break;
-
-        const deduct = Math.min(batch.current_volume, remainingToFulfill);
-        remainingToFulfill -= deduct;
-
-        // Deduct milk from the batch
-        await tx.milk_Batches.update({
-          where: { batch_id: batch.batch_id },
-          data: { current_volume: batch.current_volume - deduct }
-        });
-
-        // Log the official transaction ledger
-        await tx.transactions.create({
-          data: {
-            rtn_reference: rtn,
-            receiver_id: member!.member_id,
-            batch_id: batch.batch_id,
-            dispensed_vol: deduct,
-            base_fee: deduct * 2.0,
-            deposit_fee: Number(cost) - (deduct * 2.0),
-            total_fee: Number(cost),
-            processed_by: activeStaff!.staff_id
-          }
-        });
+    // 3. Update the member's profile to hold this active, pending request
+    await prisma.member_Profiles.update({
+      where: { tracking_no: mtn },
+      data: {
+        rtn: generatedRtn,
+        rtn_status: 'pending',          // Forces the frontend into STATE 2
+        rtn_volume: Number(volume),
+        rtn_hospital: hospital,
+        rtn_infant_gender: infant_gender,
+        rtn_dispensing_program: dispensing_program,
+        rtn_bottle_type: bottle_type,
+        rtn_fee: Number(cost),
+        // Note: Abstract and prescription file paths would ideally be saved here too 
+        // if you implement a cloud storage bucket upload (like AWS S3 or Supabase Storage).
       }
-
-      // 3. Clear the RTN Ticket from the Member's Profile
-      await tx.member_Profiles.update({
-        where: { tracking_no: mtn },
-        data: {
-          rtn: null, rtn_status: null, rtn_volume: null, rtn_fee: null,
-          rtn_hospital: null, rtn_abstract: null, rtn_prescription: null,
-          rtn_remarks: null, rtn_bottle_type: null, rtn_infant_gender: null,
-          rtn_dispensing_program: null
-        }
-      });
     });
 
-    return NextResponse.json({ message: "Dispense complete!" }, { status: 200 });
+    // 4. Return success and the new RTN to the frontend
+    return NextResponse.json({ 
+      message: "Milk request logged. Pending medical verification.", 
+      rtn: generatedRtn 
+    }, { status: 200 });
 
   } catch (error) {
-    console.error("DISPENSE ERROR:", error);
-    return NextResponse.json({ error: "Failed to dispense milk." }, { status: 500 });
+    console.error("DISPENSE REQUEST ERROR:", error);
+    return NextResponse.json({ error: "Failed to submit request to the network." }, { status: 500 });
   }
 }

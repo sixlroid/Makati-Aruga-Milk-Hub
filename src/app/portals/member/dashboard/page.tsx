@@ -232,18 +232,42 @@ export default function MemberDashboard() {
           </div>
         ) : (
           <div id="dashboard" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* UPDATED: 2-Column Balanced Top Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Card 1: Core IDs */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                <div className="text-[10px] uppercase tracking-wider font-black text-slate-400">Member Core IDs</div>
-                <div className="mt-2 space-y-2 text-sm text-slate-700">
-                  <div><span className="font-semibold">Member ID:</span> {profile.tracking_no}</div>
-                  <div><span className="font-semibold">Donor Tracking No. (DTN):</span> {profile.dtn ?? 'N/A'}</div>
-                  <div><span className="font-semibold">Receiver Tracking No. (RTN):</span> {profile.rtn ?? 'N/A'}</div>
+                <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading mb-4">Member Core IDs</h2>
+                <div className="space-y-3 text-sm text-slate-700">
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="font-semibold text-slate-800">Member ID:</span> 
+                    <span className="font-mono font-bold text-slate-00">{profile.tracking_no}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="font-semibold text-slate-800">Donor Tracking Number (DTN):</span> 
+                    <span className="font-mono font-bold text-slate-500">{profile.dtn ?? 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-800">Request Tracking Number (RTN):</span> 
+                    <span className="font-mono font-bold text-slate-500">{profile.rtn ?? 'N/A'}</span>
+                  </div>
+                </div>
               </div>
+
+              {/* Card 2: Lifetime Contributions */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lifetime Contributions</span>
+                <div className="text-5xl font-black text-[#E04A75] font-heading mt-2">
+                  {totalVolumeDonated} <span className="text-2xl text-slate-400">mL</span>
+                </div>
+                <span className="text-[10px] text-[#E04A75] font-black uppercase tracking-wider block mt-3 bg-pink-50 border border-pink-100 px-3 py-1.5 rounded-full">
+                  Across {history.length} Validated Bottles
+                </span>
               </div>
+
             </div>
 
-            
             <div id="donation-ledger" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
                 <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Personal Storage History</h2>
