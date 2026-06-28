@@ -2,8 +2,8 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 
-const handler = NextAuth({
-  session: { strategy: "jwt" },
+export const authOptions = {
+  session: { strategy: "jwt" as const },
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -98,12 +98,23 @@ const handler = NextAuth({
     })
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = (user as any).role;
         token.name = (user as any).name ?? token.name;
         token.fullName = (user as any).fullName;
       }
+
+      // When the client calls updateSession({...}), NextAuth re-invokes this
+      // callback with trigger === "update" and the payload passed to
+      // updateSession() available as `session`. Without this branch, the
+      // token never changes after initial sign-in, so the UI keeps showing
+      // stale data even though the database was updated successfully.
+      if (trigger === "update" && session?.user) {
+        token.fullName = session.user.fullName ?? token.fullName;
+        token.email = session.user.email ?? token.email;
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -111,6 +122,7 @@ const handler = NextAuth({
         (session.user as any).role = token.role;
         (session.user as any).name = token.name ?? session.user.name;
         (session.user as any).fullName = token.fullName;
+        session.user.email = (token.email as string) ?? session.user.email;
       }
       return session;
     }
@@ -118,6 +130,8 @@ const handler = NextAuth({
   pages: {
     signIn: "/",
   }
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
