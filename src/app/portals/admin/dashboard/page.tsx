@@ -207,7 +207,7 @@ export default function AdminDashboard() {
   const visibleReleases = filteredReleases.slice((safeReleasePage - 1) * pageSize, safeReleasePage * pageSize);
   const visibleAuditLogs = filteredAuditLogs.slice((safeAuditPage - 1) * pageSize, safeAuditPage * pageSize);
 
-  const handleAccountAction = async (userId: number, action: 'deactivate' | 'delete') => {
+  const handleAccountAction = async (userId: number) => {
     setBusyId(userId);
     setMessage(null);
 
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
       const res = await fetch('/api/admin/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, action })
+        body: JSON.stringify({ userId, action: 'deactivate' })
       });
 
       const data = await res.json();
@@ -328,8 +328,8 @@ export default function AdminDashboard() {
               <div className="flex flex-wrap gap-2 rounded-full border border-slate-200 bg-slate-50 p-1.5">
                 {[
                   { key: 'accounts', label: 'User Directory' },
-                  { key: 'donations', label: 'Donations' },
-                  { key: 'releases', label: 'Released Milk' },
+                  { key: 'donations', label: 'Donation History' },
+                  { key: 'releases', label: 'Dispensing History' },
                   { key: 'audit', label: 'Audit Log' }
                 ].map((tab) => (
                   <button
@@ -503,19 +503,11 @@ export default function AdminDashboard() {
                               <div className="flex flex-wrap gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => handleAccountAction(account.id, 'deactivate')}
+                                  onClick={() => handleAccountAction(account.id)}
                                   disabled={busyId === account.id}
                                   className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-60"
                                 >
                                   {busyId === account.id ? 'Working…' : 'Deactivate'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAccountAction(account.id, 'delete')}
-                                  disabled={busyId === account.id}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
-                                >
-                                  {busyId === account.id ? 'Working…' : 'Delete'}
                                 </button>
                               </div>
                             </td>
@@ -555,12 +547,17 @@ export default function AdminDashboard() {
             {activeTab === 'donations' ? (
               <>
                 <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <input
-                    value={donationSearch}
-                    onChange={(event) => setDonationSearch(event.target.value)}
-                    placeholder="Search donor history"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-[#E04A75] focus:ring-2 focus:ring-rose-100 md:max-w-xs"
-                  />
+                  <div className="flex-1">
+                    <input
+                      value={donationSearch}
+                      onChange={(event) => setDonationSearch(event.target.value)}
+                      placeholder="Search donor history"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-[#E04A75] focus:ring-2 focus:ring-rose-100 md:max-w-xs"
+                    />
+                    <p className="mt-2 text-sm text-slate-500">
+                      Browse the paginated ledger of incoming raw milk collections with donor, batch, and date filters.
+                    </p>
+                  </div>
                   <div className="text-xs font-medium text-slate-500">
                     Showing {pageSize} records per page.
                   </div>
@@ -666,12 +663,17 @@ export default function AdminDashboard() {
             {activeTab === 'releases' ? (
               <>
                 <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <input
-                    value={releaseSearch}
-                    onChange={(event) => setReleaseSearch(event.target.value)}
-                    placeholder="Search release history"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-[#E04A75] focus:ring-2 focus:ring-rose-100 md:max-w-xs"
-                  />
+                  <div className="flex-1">
+                    <input
+                      value={releaseSearch}
+                      onChange={(event) => setReleaseSearch(event.target.value)}
+                      placeholder="Search release history"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-[#E04A75] focus:ring-2 focus:ring-rose-100 md:max-w-xs"
+                    />
+                    <p className="mt-2 text-sm text-slate-500">
+                      Search outgoing pasteurized milk releases by receiver, batch, staff, or date.
+                    </p>
+                  </div>
                   <div className="text-xs font-medium text-slate-500">
                     Showing {pageSize} records per page.
                   </div>
