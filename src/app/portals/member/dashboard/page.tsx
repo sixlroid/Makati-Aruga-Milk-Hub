@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useSession } from 'next-auth/react';``
+import { useSession } from 'next-auth/react';
 
 type MemberProfile = {
   member_id: number;
@@ -232,263 +232,26 @@ export default function MemberDashboard() {
           </div>
         ) : (
           <div id="dashboard" className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-black text-slate-800 tracking-tight font-heading">
-                  Mabuhay, {profile.first_name} {profile.last_name}!
-                </h1>
-                <p className="text-xs text-slate-500 mt-0.5">Thank you for helping save fragile lives across Makati City neonatal networks.</p>
-              </div>
-              
-              <div className="flex flex-col items-end gap-2 shrink-0">
-                <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 font-mono text-center w-full">
-                  <span className="block text-[9px] uppercase tracking-wider font-black text-slate-400">Your Tracking Code</span>
-                  <span className="text-sm font-black text-slate-700">{profile.tracking_no}</span>
-                </div>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lifetime Contributions</span>
-                <div className="text-3xl font-black text-[#E04A75] font-heading mt-1">{totalVolumeDonated} mL</div>
-                <span className="text-[11px] text-slate-500 font-bold block mt-1">Across {history.length} Individual Bottles</span>
+                <div className="text-[10px] uppercase tracking-wider font-black text-slate-400">Member Core IDs</div>
+                <div className="mt-2 space-y-2 text-sm text-slate-700">
+                  <div><span className="font-semibold">Member ID:</span> {profile.tracking_no}</div>
+                  <div><span className="font-semibold">Donor Tracking No. (DTN):</span> {profile.dtn ?? 'N/A'}</div>
+                  <div><span className="font-semibold">Receiver Tracking No. (RTN):</span> {profile.rtn ?? 'N/A'}</div>
+              </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Interactive Profile & Identity Settings Desk</h2>
-                  <p className="text-xs text-slate-500 mt-1">Update your display identity, channel contact target, and validation documentation reference safely.</p>
-                </div>
-              </div>
-
-              {message ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div>
-              ) : null}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[10px] uppercase tracking-wider font-black text-slate-400">Member Core IDs</div>
-                  <div className="mt-2 space-y-2 text-sm text-slate-700">
-                    <div><span className="font-semibold">Tracking No:</span> {profile.tracking_no}</div>
-                    <div><span className="font-semibold">Donor Tracking No:</span> {profile.dtn ?? 'Generating…'}</div>
-                    <div><span className="font-semibold">Receiver Tracking No:</span> {profile.rtn ?? 'Generating…'}</div>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="text-sm text-slate-600">
-                      <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">First name</span>
-                      <input
-                        value={formState.first_name}
-                        onChange={(event) => setFormState((current) => ({ ...current, first_name: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="text-sm text-slate-600">
-                      <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Last name</span>
-                      <input
-                        value={formState.last_name}
-                        onChange={(event) => setFormState((current) => ({ ...current, last_name: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      />
-                    </label>
-                  </div>
-
-                  <label className="block text-sm text-slate-600">
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Middle initial</span>
-                    <input
-                      value={formState.middle_initial}
-                      onChange={(event) => setFormState((current) => ({ ...current, middle_initial: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                    />
-                  </label>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="text-sm text-slate-600">
-                      <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Contact target</span>
-                      <input
-                        value={formState.email}
-                        onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                        placeholder="email or contact alias"
-                      />
-                    </label>
-                    <label className="text-sm text-slate-600">
-                      <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Phone number</span>
-                      <input
-                        value={formState.phone_number}
-                        onChange={(event) => setFormState((current) => ({ ...current, phone_number: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      />
-                    </label>
-                  </div>
-
-                  <label className="block text-sm text-slate-600">
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Validation documentation</span>
-                    <textarea
-                      value={formState.medical_docs}
-                      onChange={(event) => setFormState((current) => ({ ...current, medical_docs: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      rows={3}
-                      placeholder="Paste a document reference, upload note, or validation link"
-                    />
-                  </label>
-
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="rounded-xl bg-[#E04A75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c83b62] disabled:opacity-60"
-                  >
-                    {saving ? 'Saving…' : 'Save Identity Desk'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-                {/* Visual Side Border based on overarching profile status */}
-                <div className={`absolute top-0 left-0 h-full w-1.5 shrink-0 ${
-                  profile.status === 'Approved' ? 'bg-emerald-500' : profile.status === 'Deferred' ? 'bg-red-500' : 'bg-amber-400'
-                }`} />
-                
-                <div className="flex items-center justify-between gap-4 mb-4 pl-3">
-                  <div>
-                    <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Health Screening Status</h2>
-                    <p className="text-xs text-slate-500 mt-1">Approved screenings remain valid for 3 months before donation.</p>
-                  </div>
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase ${profile.screening_valid ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
-                    {profile.screening_valid ? 'Valid' : 'Needs renewal'}
-                  </span>
-                </div>
-                
-                <div className="space-y-3 text-sm text-slate-700 pl-3">
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <span className="font-semibold w-1/3">Clinical File:</span> 
-                    <span className={`font-bold ${profile.status === 'Approved' ? 'text-emerald-600' : profile.status === 'Deferred' ? 'text-red-600' : 'text-amber-600'}`}>
-                      {profile.status === 'Approved' && '✅ Approved'}
-                      {profile.status === 'Deferred' && '🚫 Deferred'}
-                      {profile.status === 'Single' && '⏳ Pending Review'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2"><span className="font-semibold w-1/3">Last check:</span> {profile.last_screening_at ? new Date(profile.last_screening_at).toLocaleDateString('en-GB') : 'Not available'}</div>
-                  <div className="flex items-center gap-2"><span className="font-semibold w-1/3">Valid until:</span> {profile.screening_valid_until ? new Date(profile.screening_valid_until).toLocaleDateString('en-GB') : 'N/A'}</div>
-                  <div className="flex items-center gap-2 pt-2"><span className="font-semibold w-1/3">Donation eligible:</span> {profile.eligible_to_donate ? <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs font-bold">Yes</span> : <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-xs font-bold">No</span>}</div>
-                </div>
-              </div>
-
-              <div id="request-milk" className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="mb-4">
-                  <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Request Milk</h2>
-                  <p className="text-xs text-slate-500 mt-1">Submit a receiver request through the network.</p>
-                </div>
-                {requestMessage ? (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 mb-4">{requestMessage}</div>
-                ) : null}
-                <form onSubmit={handleRequestMilk} className="space-y-4">
-                  <label className="block text-sm text-slate-600">
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Requested volume (mL)</span>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={requestVolume}
-                      onChange={(event) => setRequestVolume(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      placeholder="e.g. 150"
-                    />
-                  </label>
-                  <label className="block text-sm text-slate-600">
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Hospital or destination</span>
-                    <input
-                      type="text"
-                      value={requestHospital}
-                      onChange={(event) => setRequestHospital(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      placeholder="e.g. Makati Medical Center"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    disabled={requestSubmitting}
-                    className="w-full rounded-xl bg-[#E04A75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c83b62] disabled:opacity-60"
-                  >
-                    {requestSubmitting ? 'Submitting…' : 'Request Milk'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="mb-4">
-                <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Donate Milk by Appointment</h2>
-                <p className="text-xs text-slate-500 mt-1">Schedule donation appointments only after nurse approval and valid screening.</p>
-              </div>
-              {donationMessage ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 mb-4">{donationMessage}</div>
-              ) : null}
-              <form onSubmit={handleScheduleDonation} className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block text-sm text-slate-600">
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Donation volume (mL)</span>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={donationVolume}
-                      onChange={(event) => setDonationVolume(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      placeholder="e.g. 200"
-                    />
-                  </label>
-                  <label className="block text-sm text-slate-600">
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Donation source</span>
-                    <input
-                      type="text"
-                      value={donationSource}
-                      onChange={(event) => setDonationSource(event.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                      placeholder="Scheduled donation"
-                    />
-                  </label>
-                </div>
-                {profile.has_previous_donations ? (
-                  <label className="flex items-start gap-3 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={confirmNoNewRisks}
-                      onChange={(event) => setConfirmNoNewRisks(event.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#E04A75]"
-                    />
-                    <span>I confirm that no new health risks have arisen since my last approved screening.</span>
-                  </label>
-                ) : null}
-                <button
-                  type="submit"
-                  disabled={donationSubmitting || !profile.eligible_to_donate}
-                  className="w-full rounded-xl bg-[#1A1A1A] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                >
-                  {donationSubmitting ? 'Scheduling…' : 'Schedule Donation'}
-                </button>
-                {!profile.eligible_to_donate ? (
-                  <p className="text-xs text-amber-600">Donations are only available after nurse approval and with a screening valid within the last 3 months.</p>
-                ) : null}
-              </form>
-            </div>
-
+            
             <div id="donation-ledger" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
-                <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Your Personal Storage History Ledger</h2>
+                <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Personal Storage History</h2>
               </div>
 
               {history.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 text-xs font-medium">
-                  You haven't logged any physical milk storage deposits in the database pipeline yet.
+                  No physical milk storage deposits yet.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
