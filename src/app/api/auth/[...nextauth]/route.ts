@@ -57,8 +57,8 @@ const handler = NextAuth({
               ]
             },
             include: {
-              Member_Profile: { select: { status: true, tracking_no: true } },
-              Staff_Profile: { select: { status: true, tracking_no: true } }
+              Member_Profile: true,
+              Staff_Profile: true
             }
           });
         } catch (error) {
@@ -92,6 +92,7 @@ const handler = NextAuth({
           email: user.email,
           role: user.role,
           name: userTrackingNumber,
+          fullName: `${(user as any).Member_Profile?.first_name ?? (user as any).Staff_Profile?.first_name ?? ''} ${(user as any).Member_Profile?.last_name ?? (user as any).Staff_Profile?.last_name ?? ''}`.trim(), // <-- Pass real name here
         };
       }
     })
@@ -101,6 +102,7 @@ const handler = NextAuth({
       if (user) {
         token.role = (user as any).role;
         token.name = (user as any).name ?? token.name;
+        token.fullName = (user as any).fullName;
       }
       return token;
     },
@@ -108,6 +110,7 @@ const handler = NextAuth({
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).name = token.name ?? session.user.name;
+        (session.user as any).fullName = token.fullName;
       }
       return session;
     }

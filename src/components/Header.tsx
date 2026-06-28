@@ -1,5 +1,5 @@
 'use client';
-import LogoutButton from '@/components/LogoutButton';
+import { useState } from 'react'; // <-- Added useState import
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -31,27 +31,29 @@ const navLinks: Record<string, { label: string; href: string }[]> = {
 export default function Header() {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const [dropdownOpen, setDropdownOpen] = useState(false); // <-- Track dropdown menu visibility
+
   if (pathname === '/') return null;
 
   const rawRole = (session?.user as { role?: string; tracking_no?: string })?.role;
-const roleMap: Record<string, string> = {
-  'member_donor_receiver': 'member',
-  'MEMBER_DONOR_RECEIVER': 'member',
-  'nurse_midwife': 'nurse',
-  'NURSE_MIDWIFE': 'nurse',
-  'laboratory_staff': 'lab',
-  'LABORATORY_STAFF': 'lab',
-  'administrator': 'admin',
-  'ADMINISTRATOR': 'admin',
-};
-const role = rawRole ? (roleMap[rawRole] ?? rawRole) : undefined;
+  const roleMap: Record<string, string> = {
+    'member_donor_receiver': 'member',
+    'MEMBER_DONOR_RECEIVER': 'member',
+    'nurse_midwife': 'nurse',
+    'NURSE_MIDWIFE': 'nurse',
+    'laboratory_staff': 'lab',
+    'LABORATORY_STAFF': 'lab',
+    'administrator': 'admin',
+    'ADMINISTRATOR': 'admin',
+  };
+  const role = rawRole ? (roleMap[rawRole] ?? rawRole) : undefined;
   const trackingNo = (session?.user as { role?: string; tracking_no?: string })?.tracking_no;
   const links = role ? navLinks[role] ?? [] : [];
 
   if (!session) return null;
 
   return (
-    <header className="w-full bg-white border-b border-slate-200 shadow-sm">
+    <header className="w-full bg-white border-b border-slate-200 shadow-sm relative">
       <div className="px-6 h-16 flex items-center justify-between gap-6">
 
         {/* Left: Logo + Name */}
@@ -81,8 +83,54 @@ const role = rawRole ? (roleMap[rawRole] ?? rawRole) : undefined;
           </nav>
         )}
 
-        {/* Right: Sign out button */}
-        <LogoutButton />
+        {/* Right: Dynamic Profile Dropdown Menu */}
+        <div className="relative">
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="flex items-center gap-2 px-4 py-2 border border-pink-200 rounded-xl bg-pink-50/50 hover:bg-pink-50 transition-all text-sm font-semibold text-slate-700 hover:text-[#E04A75] focus:outline-none focus:ring-2 focus:ring-pink-300/50"
+          >
+            <span>Mabuhay, {(session.user as any).fullName || 'User'}!</span>
+            <svg
+              className={`w-4 h-4 text-[#E04A75] transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white border border-pink-100 rounded-xl shadow-md py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+              {/* Edit Profile Action */}
+              <Link
+                href={`/portals/${role || 'member'}/dashboard`}
+                onClick={() => setDropdownOpen(false)}
+                className="flex items-center w-full px-4 py-2.5 text-sm text-slate-700 hover:text-[#E04A75] hover:bg-pink-50 transition-colors font-semibold border-b border-pink-50"
+              >
+                <svg className="w-4 h-4 mr-2 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Edit Profile
+              </Link>
+
+              {/* Sign Out Action */}
+              <button
+                onClick={() => {
+                  setDropdownOpen(false);
+                  signOut({ callbackUrl: '/' });
+                }}
+                className="flex items-center w-full px-4 py-2.5 text-sm text-[#E04A75] hover:bg-pink-50/70 transition-colors font-semibold text-left"
+              >
+                <svg className="w-4 h-4 mr-2 text-[#E04A75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sign Out
+              </button>
+            </div>
+          )}
+        </div>
+
       </div>
     </header>
   );
