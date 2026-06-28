@@ -1,352 +1,259 @@
 'use client';
-import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import MilkLabelModal from '@/components/MilkLabelModal';
-import LogoutButton from '@/components/LogoutButton';
-import { LINE_BREAK } from 'html2canvas/dist/types/css/property-descriptors/line-break';
 
-export default function NurseDashboard() {
-  // --- STATS STATE ---
-  const [stats, setStats] = useState({
-    raw_volume: 0,
-    active_donors: 0,
-    dispensed_volume: 0
-  });
+type MilkRequest = {
+  rtn: string; mtn: string; requested_volume: number; hospital: string;
+  status: 'pending' | 'approved' | 'arriving'; computed_fee?: number;
+  created_at: string; rtn_abstract?: string; rtn_prescription?: string;
+  bottle_type: string; infant_gender: string; dispensing_program: string;
+};
 
-  // --- RAW DONATION STATES ---
-  const [donorMtn, setDonorMtn] = useState('');
+export default function CollectingAndDispensingDashboard() {
+  const [stats, setStats] = useState({ raw_volume: 0, active_donors: 0, dispensed_volume: 0, pasteurized_volume: 0 });
+  const [dtnReference, setDtnReference] = useState('');
   const [volume, setVolume] = useState('');
-  const [source, setSource] = useState('I. In House');
+  const [source, setSource] = useState('In House');
+  const [confirmRisks, setConfirmRisks] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
 
-  // --- NEW: DISPENSING STATES ---
-  const [receiverMtn, setReceiverMtn] = useState('');
-  const [dispenseVolume, setDispenseVolume] = useState('');
-  const [hospital, setHospital] = useState('within_makati');
-  const [bottleType, setBottleType] = useState('ameda');
-  const [isDispensing, setIsDispensing] = useState(false);
+  const [activeQueueTab, setActiveQueueTab] = useState<'pending' | 'pickup'>('pending');
+  const [requests, setRequests] = useState<MilkRequest[]>([]);
+  const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
+  const [approvedVolume, setApprovedVolume] = useState('');
   const [showLabel, setShowLabel] = useState(false);
   const [labelData, setLabelData] = useState<any>(null);
-  const [inquiries, setInquiries] = useState<any[]>([]);
-  const [inquiryForm, setInquiryForm] = useState({ requester_name: '', contact_info: '', required_volume: '' });
-  const [isSavingInquiry, setIsSavingInquiry] = useState(false);
-  const RATE_PER_ML = 2.0;
-  const BOTTLE_DEPOSIT = 50;
-  const computedCost = hospital === 'outside_makati'
-    ? (Number(dispenseVolume) || 0) * RATE_PER_ML + BOTTLE_DEPOSIT
-    : 0;
 
-  // --- FETCH STATS ON LOAD ---
   const fetchStats = async () => {
-    try {
-      const res = await fetch('/api/nurse/stats');
-      if (res.ok) setStats(await res.json());
-    } catch (error) {
-      console.error("Failed to load stats", error);
-    }
+    try { const res = await fetch('/api/nurse/stats');
+    if (res.ok) setStats(await res.json()); } catch (e) {}
   };
 
-  const fetchInquiries = async () => {
-    try {
-      const res = await fetch('/api/inquiries');
-      if (res.ok) setInquiries(await res.json());
-    } catch (error) {
-      console.error('Failed to load inquiries', error);
-    }
+  const fetchRequests = async () => {
+    try { const res = await fetch('/api/nurse/requests');
+    if (res.ok) setRequests(await res.json()); } catch (e) {}
   };
 
   useEffect(() => {
     fetchStats();
-    fetchInquiries();
+    fetchRequests();
   }, []);
 
-  // --- HANDLER: LOG RAW DONATION ---
-  const handleLogDonation = async (e: React.FormEvent) => {
+  const handleLogDonation = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLogging(true);
     try {
       const response = await fetch('/api/collections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mtn: donorMtn, volume: volume, source: source })
+        body: JSON.stringify({ dtn: dtnReference, volume, source, confirm_no_new_risks: confirmRisks })
       });
       const data = await response.json();
       if (response.ok) {
-        // Pop open the printable label!
-        setLabelData({ mtn: donorMtn, volume: volume });
+        setLabelData({ dtn: dtnReference, volume });
         setShowLabel(true);
-        
-        // Clear the form
-        setDonorMtn('');
-        setVolume('');
-        fetchStats(); // Refresh stats!
-      } else {
-        alert(`Error: ${data.error}`);
-      }
-    } catch (error: any) {
-      alert(`Submission failed: ${error.message}`);
-    } finally {
-      setIsLogging(false);
-    }
+        setDtnReference(''); setVolume(''); setConfirmRisks(false);
+        fetchStats(); 
+      } else { alert(`Error: ${data.error}`); }
+    } catch (e: any) { alert(`Submission failed: ${e.message}`); } finally { setIsLogging(false); }
   };
 
-  // --- NEW HANDLER: DISPENSE MILK ---
-  const handleDispense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsDispensing(true);
+  const handleApproveReview = async (rtn: string, mtn: string, requestedBottle: string, requestedVol: number) => {
+    setIsProcessingRequest(rtn);
     try {
-      const response = await fetch('/api/dispense', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          mtn: receiverMtn, 
-          volume: dispenseVolume, 
-          hospital: hospital, 
-          bottleType: bottleType,
-          cost: computedCost 
-        })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert(`Success: ${data.message}`);
-        setReceiverMtn('');
-        setDispenseVolume('');
-        fetchStats(); // Refresh stats so Dispensed Volume ticks up!
-      } else {
-        alert(`Error: ${data.error}`);
-      }
-    } catch (error: any) {
-      alert(`Submission failed: ${error.message}`);
-    } finally {
-      setIsDispensing(false);
-    }
+      const finalVolumeToApprove = approvedVolume ? Number(approvedVolume) : requestedVol;
+      const safeBottle = requestedBottle || 'ameda';
+      const fee = (finalVolumeToApprove * 2.0) + ({ ameda: 85, korea: 65, red_cap: 40 }[safeBottle] || 85);
+      const response = await fetch('/api/nurse/requests/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rtn, mtn, approved_volume: finalVolumeToApprove, computed_fee: fee, hospital: 'Standard Dispense' }) });
+      if (response.ok) { alert(`Approved!`); fetchRequests(); setApprovedVolume(''); } else { alert(`Error: ${(await response.json()).error}`); }
+    } catch (e: any) { alert(`Failed: ${e.message}`); } finally { setIsProcessingRequest(null); }
   };
 
-  const handleInquirySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingInquiry(true);
+  const handleRejectRequest = async (rtn: string, mtn: string) => {
+    if (!confirm("Are you sure?")) return; setIsProcessingRequest(rtn);
     try {
-      const response = await fetch('/api/inquiries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requester_name: inquiryForm.requester_name,
-          contact_info: inquiryForm.contact_info,
-          required_volume: inquiryForm.required_volume
-        })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setInquiries(prev => [data.inquiry, ...prev].slice(0, 10));
-        setInquiryForm({ requester_name: '', contact_info: '', required_volume: '' });
-        alert('Inquiry saved successfully.');
-      } else {
-        alert(`Error: ${data.error}`);
-      }
-    } catch (error: any) {
-      alert(`Submission failed: ${error.message}`);
-    } finally {
-      setIsSavingInquiry(false);
-    }
+      const res = await fetch('/api/nurse/requests/reject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rtn, mtn }) });
+      if (res.ok) fetchRequests();
+    } catch (e) {} finally { setIsProcessingRequest(null); }
   };
+
+  const handleFinalDispense = async (rtn: string, mtn: string, finalVolume: number, finalFee: number, bottleType: string) => {
+    setIsProcessingRequest(rtn);
+    try {
+      const res = await fetch('/api/dispense', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mtn, volume: finalVolume, hospital: 'pre-approved', bottleType, cost: finalFee, rtn }) });
+      if (res.ok) { alert(`Success!`); fetchRequests(); fetchStats(); } else { alert(`Error: ${(await res.json()).error}`); }
+    } catch (e: any) { alert(`Failed: ${e.message}`); } finally { setIsProcessingRequest(null); }
+  };
+
+  const pendingQueue = requests.filter(r => r.status === 'pending');
+  const pickupQueue = requests.filter(r => r.status === 'approved' || r.status === 'arriving');
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-body">
-      <div className="flex-1 p-8 lg:p-10 overflow-y-auto h-screen">
-        
-        {/* HEADER */}
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 font-heading">Nurse Station Overview</h1>
-            <p className="text-sm text-slate-500 mt-1">Manage donor collections, screenings, and NICU dispensing.</p>
-          </div>
-          <Link href="/portals/nurse/screenings/new">
-            <button className="bg-[#1A1A1A] text-white px-6 py-3 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors shadow-sm">
-              + Conduct Health Screening
-            </button>
-          </Link>
+    <div className="min-h-screen bg-slate-50 flex font-body text-slate-800 pb-12">
+      <div className="w-full max-w-7xl mx-auto p-8 lg:p-10">
+
+        <div className="mb-8">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">Collecting & Dispensing Overview</h1>
+          <p className="text-sm text-slate-500 mt-1 max-w-xl">Manage daily donor collections and NICU dispensing queues.</p>
         </div>
 
         {/* TOP STAT CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-t-4 border-t-[#E04A75]">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Raw Collections (Today)</span>
-            <div className="text-4xl font-black text-slate-800 font-heading mt-2">{stats.raw_volume} mL</div>
-            <span className="text-xs text-[#E04A75] font-bold mt-1 block">Awaiting Lab Pooling</span>
+            <div className="text-4xl font-black text-slate-900 font-heading mt-2">{stats.raw_volume.toLocaleString()} mL</div>
+            <span className="text-xs text-[#E04A75] font-bold mt-1 block">Awaiting Lab Processing</span>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-t-4 border-t-emerald-400">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Donors</span>
-            <div className="text-4xl font-black text-slate-800 font-heading mt-2">{stats.active_donors}</div>
-            <span className="text-xs text-emerald-500 font-bold mt-1 block">Cleared by Clinical Tests</span>
+            <div className="text-4xl font-black text-slate-900 font-heading mt-2">{stats.active_donors}</div>
+            <span className="text-xs text-emerald-600 font-bold mt-1 block">Cleared by Clinical Tests</span>
           </div>
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-t-4 border-t-blue-400">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-t-4 border-t-indigo-400">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dispensed (This Month)</span>
-            <div className="text-4xl font-black text-slate-800 font-heading mt-2">{stats.dispensed_volume} mL</div>
-            <span className="text-xs text-blue-500 font-bold mt-1 block">Successfully released to NICU</span>
+            <div className="text-4xl font-black text-slate-900 font-heading mt-2">{stats.dispensed_volume.toLocaleString()} mL</div>
+            <span className="text-xs text-indigo-600 font-bold mt-1 block">Successfully released to NICU</span>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-t-4 border-t-amber-400">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pasteurized Vault</span>
+            <div className="text-4xl font-black text-slate-900 font-heading mt-2">{(stats.pasteurized_volume || 0).toLocaleString()} mL</div>
+            <span className="text-xs text-amber-500 font-bold mt-1 block">Cleared & Available</span>
           </div>
         </div>
 
         {/* MAIN MODULES GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          
-          {/* MODULE 1: LOG RAW DONATION */}
-          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-            <h3 className="text-lg font-bold text-[#E04A75] font-heading mb-1">Log Raw Donation Session</h3>
-            <p className="text-xs text-slate-500 mb-6">Record expressed milk volumes collected under City campaigns.</p>
-            
-            <form className="space-y-5 flex-1 flex flex-col" onSubmit={handleLogDonation}>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Select Donor Profile (MTN)</label>
-                <input type="text" required value={donorMtn} onChange={(e) => setDonorMtn(e.target.value)} placeholder="e.g. MID-1024" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75] uppercase" />
-              </div>
-              <div className="flex gap-4">
-                <div className="w-1/2">
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Volume (mL)</label>
-                  <input type="number" required min="1" value={volume} onChange={(e) => setVolume(e.target.value)} placeholder="e.g. 150" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
-                </div>
-                <div className="w-1/2">
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Advocacy Source</label>
-                  <select value={source} onChange={(e) => setSource(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]">
-                    <option value="I. In House">I. In House</option>
-                    <option value="II. Moms Act">II. Moms Act</option>
-                    <option value="III. Milky Way">III. Milky Way</option>
-                    <option value="IV. SUPSUP TODO">IV. SUPSUP TODO</option>
-                    <option value="V. Others">V. Others</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-auto pt-4">
-                <button type="submit" disabled={isLogging} className="w-full bg-[#FFF0F3] text-[#E04A75] border border-[#FFDEE4] py-3 rounded-lg font-bold text-sm hover:bg-[#FFDEE4] transition-colors disabled:opacity-50">
-                  {isLogging ? 'Logging...' : 'Record Session & Print Label'}
-                </button>
-              </div>
-            </form>
-          </div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
 
-          {/* MODULE 2: DISPENSING DESK */}
-          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-            <h3 className="text-lg font-bold text-[#E04A75] font-heading mb-1">Dispensing & Fulfillment Desk</h3>
-            <p className="text-xs text-slate-500 mb-6">Release safe biological milk batches to prescribed recipients.</p>
-            
-            <form className="space-y-5 flex-1 flex flex-col" onSubmit={handleDispense}>
-              <div className="flex gap-4">
-                <div className="w-1/2">
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Receiver Account (MTN)</label>
-                  <input type="text" required value={receiverMtn} onChange={(e) => setReceiverMtn(e.target.value)} placeholder="e.g. MID-7001" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75] uppercase" />
-                </div>
-                <div className="w-1/2">
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Volume to Release (mL)</label>
-                  <input type="number" required min="1" value={dispenseVolume} onChange={(e) => setDispenseVolume(e.target.value)} placeholder="e.g. 100" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="w-1/2">
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Hospital Served</label>
-                  <select value={hospital} onChange={(e) => setHospital(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]">
-                    <option value="within_makati">w/in Makati (Subsidized)</option>
-                    <option value="outside_makati">outside Makati (Standard Rate)</option>
-                    <option value="discharged">Discharged</option>
-                  </select>
-                </div>
-                <div className="w-1/2">
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Bottle Type</label>
-                  <select value={bottleType} onChange={(e) => setBottleType(e.target.value)} className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]">
-                    <option value="ameda">Ameda</option>
-                    <option value="korea">Korea</option>
-                    <option value="red_cap">Red Cap</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* DYNAMIC PRICE CALCULATOR */}
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 transition-all mt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500 font-bold uppercase">Computed Processing Rates</span>
-                  <span className="text-lg font-black text-slate-800 font-heading">
-                    ₱{computedCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-2">Standard rate: ₱2.00 per mL plus a bottle deposit fee.</p>
-              </div>
-
-              <div className="mt-auto pt-4">
-                <button type="submit" disabled={isDispensing} className="w-full bg-[#E04A75] text-white py-3 rounded-lg font-bold text-sm hover:bg-[#C93660] transition-colors disabled:opacity-50">
-                  {isDispensing ? 'Processing Release...' : 'Approve Clinical Release'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-        </div>
-
-        {/* MODULE 3: INQUIRIES & INTAKE REGISTRY */}
-        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-[#E04A75] font-heading mb-1">Inquiries & Intake Registry</h3>
-              <p className="text-xs text-slate-500">Log phone or walk-in requests for milk, capture contact details, and save the target volume.</p>
+          {/* MODULE 1: CLINICAL INTAKE (RAW DONATIONS) */}
+          <div id="collecting" className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[550px]">
+            <div className="mb-6 border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-black text-[#E04A75] font-heading mb-1">Human Milk Collection</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Log fresh expressions from on-site appointments or walk-in donor drop-offs.
+              </p>
             </div>
+
+            <form className="space-y-6 flex-1 flex flex-col" onSubmit={handleLogDonation}>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Verify Appointment (DTN)</label>
+                <input type="text" required value={dtnReference} onChange={(e) => setDtnReference(e.target.value)} placeholder="e.g. DTN-123456" className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all uppercase font-mono bg-white shadow-inner" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Measured Vol (mL)</label>
+                  <input type="number" required min="1" value={volume} onChange={(e) => setVolume(e.target.value)} placeholder="e.g. 150" className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Collection Source</label>
+                  <select value={source} onChange={(e) => setSource(e.target.value)} className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all bg-white">
+                    <option value="In House">In House (Clinic Appt)</option>
+                    <option value="Moms Act">Moms Act Drive</option>
+                    <option value="Milky Way">Milky Way Campaign</option>
+                    <option value="Hospital Transfer">External Hospital Transfer</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-auto pt-4 border-t border-slate-100">
+                <label className="flex items-start gap-3 text-xs text-slate-700 font-medium cursor-pointer bg-amber-50 p-3 rounded-xl border border-amber-200 mb-4">
+                  <input type="checkbox" required checked={confirmRisks} onChange={(e) => setConfirmRisks(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-[#E04A75]" />
+                  <span>I confirm that I have interviewed the donor and there are no new health risks, infectious symptoms, or restricted medications since their last screening.</span>
+                </label>
+                <button type="submit" disabled={isLogging} className="w-full bg-[#1A1A1A] text-white py-4 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 shadow-sm flex justify-center items-center gap-2">
+                  {isLogging ? 'Registering to Database...' : 'Log to Cold Storage & Print Label'}
+                </button>
+              </div>
+            </form>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6">
-            <form className="space-y-4" onSubmit={handleInquirySubmit}>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Requester Name</label>
-                <input type="text" required value={inquiryForm.requester_name} onChange={(e) => setInquiryForm(prev => ({ ...prev, requester_name: e.target.value }))} placeholder="e.g. Maria Santos" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
+          {/* MODULE 2: MILK DISPENSING */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[550px] overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-black text-[#E04A75] font-heading mb-1">Milk Dispensing & Fulfillment</h3>
+                  <p className="text-xs text-slate-500">Manage member requests and release safe biological batches.</p>
+                </div>
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Contact Details</label>
-                <input type="text" required value={inquiryForm.contact_info} onChange={(e) => setInquiryForm(prev => ({ ...prev, contact_info: e.target.value }))} placeholder="Phone, email, or address" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
+              <div className="flex bg-white rounded-lg p-1 border border-slate-200">
+                <button onClick={() => setActiveQueueTab('pending')} className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${activeQueueTab === 'pending' ? 'bg-[#E04A75] text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Medical Reviews ({pendingQueue.length})</button>
+                <button onClick={() => setActiveQueueTab('pickup')} className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${activeQueueTab === 'pickup' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Awaiting Pickup ({pickupQueue.length})</button>
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Target Volume (mL)</label>
-                <input type="number" required min="1" value={inquiryForm.required_volume} onChange={(e) => setInquiryForm(prev => ({ ...prev, required_volume: e.target.value }))} placeholder="e.g. 250" className="w-full border border-slate-300 p-3 rounded-lg outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
-              </div>
-              <button type="submit" disabled={isSavingInquiry} className="w-full bg-[#1A1A1A] text-white py-3 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50">
-                {isSavingInquiry ? 'Saving inquiry...' : 'Save Inquiry'}
-              </button>
-            </form>
+            </div>
 
-            <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-bold text-slate-800">Recent Intake Requests</h4>
-                <span className="text-[11px] text-slate-500">Latest 10</span>
-              </div>
-              <div className="space-y-2 max-h-[320px] overflow-auto">
-                {inquiries.length === 0 ? (
-                  <div className="text-sm text-slate-500">No inquiries logged yet.</div>
-                ) : (
-                  inquiries.map((item) => (
-                    <div key={item.inquiry_id} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <div className="flex justify-between gap-3 items-start">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-800">{item.requester_name}</p>
-                          <p className="text-xs text-slate-500 mt-1">{item.contact_info}</p>
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {activeQueueTab === 'pending' && (
+                <div className="space-y-4">
+                  {pendingQueue.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 text-xs font-medium">No pending requests requiring medical review.</div>
+                  ) : (
+                    pendingQueue.map(req => (
+                      <div key={req.rtn} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <span className="font-mono text-xs font-bold text-slate-800">{req.rtn}</span>
+                            <span className="block text-[10px] text-slate-400 uppercase mt-0.5">Member: {req.mtn}</span>
+                          </div>
+                          <span className="bg-amber-100 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded">Requested: {req.requested_volume}mL</span>
                         </div>
-                        <span className="text-xs font-bold text-[#E04A75]">{item.required_volume} mL</span>
+                        <div className="flex gap-2 mb-4">
+                          <button disabled={!req.rtn_abstract} onClick={() => window.open(req.rtn_abstract, '_blank')} className="flex-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 py-1.5 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50">📄 View Abstract</button>
+                          <button disabled={!req.rtn_prescription} onClick={() => window.open(req.rtn_prescription, '_blank')} className="flex-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 py-1.5 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50">📄 View Prescription</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-indigo-50/40 rounded-lg border border-indigo-100/50">
+                          <div><span className="block text-[9px] font-bold text-indigo-400 uppercase mb-0.5">Gender</span><span className="text-xs font-semibold text-indigo-900">{req.infant_gender === 'M' ? 'Male' : 'Female'}</span></div>
+                          <div><span className="block text-[9px] font-bold text-indigo-400 uppercase mb-0.5">Program</span><span className="text-xs font-semibold text-indigo-900 truncate block">{req.dispensing_program}</span></div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-indigo-400 uppercase mb-0.5">Bottle</span>
+                            <span className="text-xs font-semibold text-indigo-900 capitalize">
+                              {req.bottle_type ? req.bottle_type.replace('_', ' ') : 'Ameda (Default)'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Approved Vol (mL)</label>
+                          <input type="number" placeholder={`Leave blank to approve full ${req.requested_volume}mL`} value={approvedVolume} onChange={(e) => setApprovedVolume(e.target.value)} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm outline-none focus:border-[#E04A75] focus:ring-1 focus:ring-[#E04A75]" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleApproveReview(req.rtn, req.mtn, req.bottle_type, req.requested_volume)} disabled={isProcessingRequest === req.rtn} className="flex-1 bg-amber-500 text-white text-[11px] font-bold py-2 rounded-lg hover:bg-amber-600 disabled:opacity-50">Approve Request</button>
+                          <button onClick={() => handleRejectRequest(req.rtn, req.mtn)} disabled={isProcessingRequest === req.rtn} className="px-3 bg-white border border-red-200 text-red-600 text-[11px] font-bold py-2 rounded-lg hover:bg-red-50 disabled:opacity-50">Reject</button>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center mt-2 text-[11px] text-slate-500">
-                        <span>{item.status}</span>
-                        <span>{new Date(item.created_at || item.timestamp || Date.now()).toLocaleDateString()}</span>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeQueueTab === 'pickup' && (
+                <div className="space-y-4">
+                  {pickupQueue.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 text-xs font-medium">No approved requests awaiting pickup.</div>
+                  ) : (
+                    pickupQueue.map(req => (
+                      <div key={req.rtn} className="bg-white border border-emerald-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 left-0 h-full w-1.5 bg-emerald-500 shrink-0" />
+                        <div className="pl-2">
+                          <div className="flex justify-between items-start mb-3">
+                            <div><span className="font-mono text-xs font-bold text-slate-800">{req.rtn}</span><span className="block text-[10px] text-slate-400 uppercase mt-0.5">Member: {req.mtn}</span></div>
+                            <div className="text-right"><span className="block text-[10px] text-slate-400 font-bold uppercase">To Release</span><span className="text-lg font-black text-emerald-600 font-heading leading-tight">{req.requested_volume} mL</span></div>
+                          </div>
+                          <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 flex justify-between items-center mb-4"><span className="text-[10px] font-bold text-emerald-800 uppercase">To Collect:</span><span className="text-sm font-black text-emerald-700">₱{req.computed_fee?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</span></div>
+                          <button onClick={() => handleFinalDispense(req.rtn, req.mtn, req.requested_volume, req.computed_fee || 0, req.bottle_type)} disabled={isProcessingRequest === req.rtn} className="w-full bg-emerald-600 text-white text-xs font-bold py-3 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm">Verify Cooler & Complete Dispense</button>
+                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
-      {/* SHOW PRINT MODAL IF TRIGGERED */}
-      {showLabel && (
-        <MilkLabelModal 
-          type="raw" 
-          data={labelData} 
-          onClose={() => setShowLabel(false)} 
-        />
-      )}
+
+      {/* MILK LABEL MODAL */}
+      {showLabel && <MilkLabelModal type="raw" data={labelData} onClose={() => setShowLabel(false)} />}
     </div>
   );
 }
