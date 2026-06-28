@@ -52,22 +52,26 @@ export default function UniversalProfilePage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Package the modified payload values
       const updatedFullName = `${firstName} ${lastName}`.trim();
 
-      /* 
-        NOTE: Commenting out the database fetch for now since the API route 
-        isn't built yet. This prevents the crash seen in image_247282.png.
-      
+      // 1. Fire live JSON payloads to the real backend route engine we just built
       const response = await fetch("/api/user/update-profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, fullName: updatedFullName, email: emailAddress }),
+        body: JSON.stringify({ 
+          firstName, 
+          lastName, 
+          email: emailAddress, 
+          phoneNumber 
+        }),
       });
-      if (!response.ok) throw new Error("Failed to update database profile parameters.");
-      */
 
-      // 2. Hot-reload the NextAuth storage cache client-side so the header updates instantly!
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Failed to update database profile parameters.");
+      }
+
+      // 2. Hot-reload the client-side session state so the system navbar updates instantly!
       if (updateSession) {
         await updateSession({
           ...session,
@@ -79,10 +83,10 @@ export default function UniversalProfilePage() {
         });
       }
 
-      alert("Profile details updated successfully (Simulation Mode)!");
-    } catch (error) {
+      alert("Profile updated successfully in the database!");
+    } catch (error: any) {
       console.error(error);
-      alert("Something went wrong while updating your account details.");
+      alert(error.message || "Something went wrong while updating your account details.");
     } finally {
       setIsSubmitting(false);
     }
