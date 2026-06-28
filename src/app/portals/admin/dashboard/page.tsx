@@ -291,7 +291,6 @@ export default function AdminDashboard() {
               <span className="font-semibold">{overview.active_accounts}</span> active accounts • <span className="font-semibold">{overview.inactive_accounts}</span> inactive
             </div>
             <div className="shrink-0">
-              <LogoutButton />
             </div>
           </div>
         </div>

@@ -135,7 +135,6 @@ export default function LabDashboard() {
             <p className="text-sm text-slate-500 mt-1 max-w-xl">Run selective pipelines, verify biological assays, and clear safe milk assets for NICU distribution.</p>
           </div>
           <div className="shrink-0 flex items-center gap-4">
-            <LogoutButton />
           </div>
         </div>
 

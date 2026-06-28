@@ -1,6 +1,7 @@
 import { Space_Grotesk, Manrope } from 'next/font/google';
 import './globals.css';
 import { Providers } from './Providers';
+import Header from '@/components/Header';
 
 // 1. Configure Space Grotesk for Headings
 const spaceGrotesk = Space_Grotesk({ 
@@ -28,10 +29,11 @@ export default function RootLayout({
     <html lang="en">
       {/* 3. Attach both font variables to the body */}
       <body className={`${spaceGrotesk.variable} ${manrope.variable} font-body antialiased bg-white text-slate-900`}>
-        <Providers>
-          {children}
-        </Providers>
-      </body>
+  <Providers>
+      <Header />
+      {children}
+  </Providers>
+</body>
     </html>
   );
 }
