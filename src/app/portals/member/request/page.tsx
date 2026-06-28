@@ -103,8 +103,28 @@ export default function RequestMilkPage() {
   };
 
   const handleConfirmPickup = async () => {
-    // Add logic here to update the RTN status to 'arriving' via your API
-    alert("Pickup confirmed! Proceed to the facility.");
+    // 1. Optimistic UI Update: Instantly flip the screen to STATE 4 (Arriving)
+    setProfile((prevProfile: any) => ({
+      ...prevProfile,
+      rtn_status: 'arriving'
+    }));
+
+    // 2. Tell the database the mother is on her way
+    try {
+      const res = await fetch('/api/member/requests/acknowledge', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracking_no: activeMtn })
+      });
+
+      if (!res.ok) {
+        // If the database fails, revert the screen and alert the user
+        alert("Failed to sync with server. Please try again.");
+        if (activeMtn) fetchProfile(activeMtn);
+      }
+    } catch (e) {
+      console.error("Arrival confirm failed", e);
+    }
   };
 
   // Helper boolean for conditional rendering

@@ -17,6 +17,10 @@ export default function CollectingAndDispensingDashboard() {
   const [confirmRisks, setConfirmRisks] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
 
+  // New states for the Appointments Queue
+  const [activeCollectionTab, setActiveCollectionTab] = useState<'log' | 'appointments'>('log');
+  const [appointments, setAppointments] = useState<any[]>([]);
+
   const [activeQueueTab, setActiveQueueTab] = useState<'pending' | 'pickup'>('pending');
   const [requests, setRequests] = useState<MilkRequest[]>([]);
   const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
@@ -34,10 +38,30 @@ export default function CollectingAndDispensingDashboard() {
     if (res.ok) setRequests(await res.json()); } catch (e) {}
   };
 
+  const fetchAppointments = async () => {
+    try { const res = await fetch('/api/nurse/appointments');
+    if (res.ok) setAppointments(await res.json()); } catch (e) {}
+  };
+
   useEffect(() => {
     fetchStats();
     fetchRequests();
+    fetchAppointments();
   }, []);
+
+  const handleApproveAppointment = async (dtn: string) => {
+    try {
+      const res = await fetch('/api/nurse/appointments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dtn })
+      });
+      if (res.ok) {
+        alert("Appointment Confirmed! Member has been notified to proceed.");
+        fetchAppointments();
+      } else { alert("Failed to confirm appointment."); }
+    } catch (e) {}
+  };
 
   const handleLogDonation = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,7 +104,7 @@ export default function CollectingAndDispensingDashboard() {
   const handleFinalDispense = async (rtn: string, mtn: string, finalVolume: number, finalFee: number, bottleType: string) => {
     setIsProcessingRequest(rtn);
     try {
-      const res = await fetch('/api/dispense', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mtn, volume: finalVolume, hospital: 'pre-approved', bottleType, cost: finalFee, rtn }) });
+      const res = await fetch('/api/nurse/dispense', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mtn, volume: finalVolume, hospital: 'pre-approved', bottleType, cost: finalFee, rtn }) });
       if (res.ok) { alert(`Success!`); fetchRequests(); fetchStats(); } else { alert(`Error: ${(await res.json()).error}`); }
     } catch (e: any) { alert(`Failed: ${e.message}`); } finally { setIsProcessingRequest(null); }
   };
@@ -125,47 +149,85 @@ export default function CollectingAndDispensingDashboard() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
 
           {/* MODULE 1: CLINICAL INTAKE (RAW DONATIONS) */}
-          <div id="collecting" className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[550px]">
-            <div className="mb-6 border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-black text-[#E04A75] font-heading mb-1">Human Milk Collection</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Log fresh expressions from on-site appointments or walk-in donor drop-offs.
-              </p>
+          <div id="collecting" className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[550px] overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-black text-[#E04A75] font-heading mb-1">Human Milk Collection</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">Log fresh expressions or approve incoming schedules.</p>
+              </div>
+              <div className="flex bg-white rounded-lg p-1 border border-slate-200">
+                <button onClick={() => setActiveCollectionTab('log')} className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${activeCollectionTab === 'log' ? 'bg-[#1A1A1A] text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Log Intake</button>
+                <button onClick={() => setActiveCollectionTab('appointments')} className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${activeCollectionTab === 'appointments' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Pending Schedules ({appointments.length})</button>
+              </div>
             </div>
 
-            <form className="space-y-6 flex-1 flex flex-col" onSubmit={handleLogDonation}>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Verify Appointment (DTN)</label>
-                <input type="text" required value={dtnReference} onChange={(e) => setDtnReference(e.target.value)} placeholder="e.g. DTN-123456" className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all uppercase font-mono bg-white shadow-inner" />
-              </div>
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              
+              {activeCollectionTab === 'log' && (
+                <form className="space-y-6 flex flex-col h-full" onSubmit={handleLogDonation}>
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Verify Confirmed DTN</label>
+                    <input type="text" required value={dtnReference} onChange={(e) => setDtnReference(e.target.value)} placeholder="e.g. DTN-123456" className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all uppercase font-mono bg-slate-50" />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Measured Vol (mL)</label>
-                  <input type="number" required min="1" value={volume} onChange={(e) => setVolume(e.target.value)} placeholder="e.g. 150" className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Collection Source</label>
-                  <select value={source} onChange={(e) => setSource(e.target.value)} className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all bg-white">
-                    <option value="In House">In House (Clinic Appt)</option>
-                    <option value="Moms Act">Moms Act Drive</option>
-                    <option value="Milky Way">Milky Way Campaign</option>
-                    <option value="Hospital Transfer">External Hospital Transfer</option>
-                    <option value="Others">Others</option>
-                  </select>
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Measured Vol (mL)</label>
+                      <input type="number" required min="1" value={volume} onChange={(e) => setVolume(e.target.value)} placeholder="e.g. 150" className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm placeholder-slate-400 focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all bg-white shadow-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Collection Source</label>
+                      <select value={source} onChange={(e) => setSource(e.target.value)} className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm focus:border-[#E04A75] focus:ring-2 focus:ring-pink-100 transition-all bg-white shadow-sm">
+                        <option value="In House">In House (Clinic Appt)</option>
+                        <option value="Moms Act">Moms Act Drive</option>
+                        <option value="Milky Way">Milky Way Campaign</option>
+                        <option value="Hospital Transfer">External Hospital Transfer</option>
+                        <option value="Others">Others</option>
+                      </select>
+                    </div>
+                  </div>
 
-              <div className="mt-auto pt-4 border-t border-slate-100">
-                <label className="flex items-start gap-3 text-xs text-slate-700 font-medium cursor-pointer bg-amber-50 p-3 rounded-xl border border-amber-200 mb-4">
-                  <input type="checkbox" required checked={confirmRisks} onChange={(e) => setConfirmRisks(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-[#E04A75]" />
-                  <span>I confirm that I have interviewed the donor and there are no new health risks, infectious symptoms, or restricted medications since their last screening.</span>
-                </label>
-                <button type="submit" disabled={isLogging} className="w-full bg-[#1A1A1A] text-white py-4 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 shadow-sm flex justify-center items-center gap-2">
-                  {isLogging ? 'Registering to Database...' : 'Log to Cold Storage & Print Label'}
-                </button>
-              </div>
-            </form>
+                  <div className="mt-auto pt-4 border-t border-slate-200">
+                    <label className="flex items-start gap-3 text-xs text-slate-700 font-medium cursor-pointer bg-white p-4 rounded-xl border border-slate-200 mb-4 shadow-sm">
+                      <input type="checkbox" required checked={confirmRisks} onChange={(e) => setConfirmRisks(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-[#E04A75]" />
+                      <span>I confirm that I have interviewed the donor and there are no new health risks, infectious symptoms, or restricted medications since their last screening.</span>
+                    </label>
+                    <button type="submit" disabled={isLogging} className="w-full bg-[#1A1A1A] text-white py-4 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 shadow-sm flex justify-center items-center gap-2">
+                      {isLogging ? 'Registering to Database...' : 'Log to Cold Storage & Print Label'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {activeCollectionTab === 'appointments' && (
+                <div className="space-y-4">
+                  {appointments.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 text-xs font-medium">No pending appointment schedules.</div>
+                  ) : (
+                    appointments.map(appt => (
+                      <div key={appt.appointment_id} className="bg-white border border-amber-200 rounded-xl p-4 shadow-sm">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <span className="font-mono text-xs font-bold text-slate-800">{appt.dtn}</span>
+                            <span className="block text-[10px] text-slate-400 uppercase mt-0.5">Member: {appt.donor?.tracking_no}</span>
+                          </div>
+                          <span className="bg-amber-100 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded">Requested Date</span>
+                        </div>
+                        <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 mb-4">
+                          <span className="block text-[11px] font-bold text-amber-800 mb-1">
+                            {new Date(appt.appointment_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+                          </span>
+                          <span className="text-xs text-amber-600 font-medium">Method: {appt.collection_method}</span>
+                        </div>
+                        <button onClick={() => handleApproveAppointment(appt.dtn)} className="w-full bg-amber-500 text-white text-xs font-bold py-3 rounded-xl hover:bg-amber-600 transition-colors shadow-sm">
+                          Approve Schedule & Notify Member
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* MODULE 2: MILK DISPENSING */}

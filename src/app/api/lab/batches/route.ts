@@ -1,92 +1,82 @@
 import { NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-// Import your auth options if they live elsewhere: import { authOptions } from "@/lib/auth";
 
-// GET: Feed the "Incoming Raw Storage Matrix"
 export async function GET() {
   try {
-    const pendingBottles = await prisma.raw_Collections.findMany({
+    // Fetch bottles that haven't been pooled yet
+    const rawQueue = await prisma.raw_Collections.findMany({
       where: { batch_id: null },
-      include: { donor: { select: { tracking_no: true } } },
+      include: { donor: true },
       orderBy: { date_collected: 'asc' }
     });
-    return NextResponse.json(pendingBottles, { status: 200 });
+    return NextResponse.json(rawQueue, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to load matrix" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load raw queue" }, { status: 500 });
   }
 }
 
-// POST: Handle the "Pasteurize Selected" Button
 export async function POST(request: Request) {
   try {
-    // 1. DYNAMIC SESSION GRABBER
-    const session = await getServerSession(); // Pass your auth options here if needed: (request, authOptions)
+    const { ids, temperature, duration, mbt_result } = await request.json();
+
+    if (!ids || ids.length === 0) {
+      return NextResponse.json({ error: "No bottles selected." }, { status: 400 });
+    }
+
+    const tempNum = Number(temperature);
+    const timeNum = Number(duration);
     
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ error: "Unauthorized session." }, { status: 401 });
+    // Evaluate Safety Rules automatically
+    let safetyFlags = null;
+    
+    // THE FIX: This MUST be exactly "Pending" to show up in your QA Tab!
+    let initialStatus = "Pending"; 
+
+    if (tempNum < 62.5 || timeNum < 30 || mbt_result === "Failed") {
+      safetyFlags = `Failed params: Temp ${tempNum}°C, Time ${timeNum}m, MBT: ${mbt_result}`;
+      initialStatus = "Flagged"; // Still goes to QA, but highlighted in Red
     }
 
-    // Find the physical staff profile attached to the logged-in user's email
-    const staffProfile = await prisma.staff_Profiles.findUnique({
-      where: { email: session.user.email }
-    });
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Calculate total pooled volume
+      const bottles = await tx.raw_Collections.findMany({
+        where: { collection_id: { in: ids } }
+      });
+      const pooledVol = bottles.reduce((sum, b) => sum + b.raw_volume_ml, 0);
 
-    if (!staffProfile) {
-      return NextResponse.json({ error: "Staff profile not found for this session." }, { status: 404 });
-    }
-
-    const { ids, temperature, duration } = await request.json();
-
-    const bottles = await prisma.raw_Collections.findMany({
-      where: { collection_id: { in: ids } }
-    });
-    const totalVolume = bottles.reduce((sum, b) => sum + b.raw_volume_ml, 0);
-
-    const isSubOptimal = parseFloat(temperature) < 62.5 || parseInt(duration) < 30;
-
-    const newBatch = await prisma.$transaction(async (tx) => {
-      const batch = await tx.milk_Batches.create({
+      // 2. Create the unified batch record
+      const newBatch = await tx.milk_Batches.create({
         data: {
-          pooled_volume: totalVolume,
-          current_volume: totalVolume,
-          pasteurization_temp: parseFloat(temperature),
-          pasteurization_time: parseInt(duration),
-          lab_status: "Pending",
-          safety_flags: isSubOptimal ? "Sub-optimal thermal process" : null
+          pooled_volume: pooledVol,
+          current_volume: pooledVol,
+          lab_status: initialStatus,
+          pasteurization_temp: tempNum,
+          pasteurization_time: timeNum,
+          safety_flags: safetyFlags
         }
       });
 
+      // 3. Link the raw bottles to this new batch ID
       await tx.raw_Collections.updateMany({
         where: { collection_id: { in: ids } },
-        data: { batch_id: batch.batch_id }
+        data: { batch_id: newBatch.batch_id }
       });
 
-      // --- DYNAMIC AUDIT LOG ---
-      await tx.audit_Logs.create({
-        data: {
-          staff_id: staffProfile.staff_id, // <--- Uses the dynamically fetched ID!
-          action_type: "CREATE_BATCH",
-          record_affected: `BATCH-${batch.batch_id}`
-        }
-      });
-      // -------------------------
-
-      return batch;
+      return newBatch;
     });
 
     return NextResponse.json({ 
-      message: isSubOptimal ? "Discard Recommended." : "Batch pasteurized and sent to QA Desk.",
+      message: safetyFlags ? "Batch created but Flagged for Discard Recommended." : "Batch processed and sent to QA.",
       results: {
-        batchId: newBatch.batch_id,
-        volume: newBatch.pooled_volume,
-        temperature: newBatch.pasteurization_temp,
-        duration: newBatch.pasteurization_time
+        batch_id: result.batch_id,
+        volume: result.pooled_volume,
+        temp: result.pasteurization_temp,
+        time: result.pasteurization_time
       }
-    }, { status: 201 });
+    }, { status: 200 });
 
   } catch (error) {
     console.error("BATCH PROCESSING ERROR:", error);
-    return NextResponse.json({ error: "Failed to process cycle" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to process batch." }, { status: 500 });
   }
 }

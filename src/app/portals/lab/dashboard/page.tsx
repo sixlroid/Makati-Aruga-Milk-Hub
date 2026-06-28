@@ -1,8 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import MilkLabelModal from '@/components/MilkLabelModal';
-import LogoutButton from '@/components/LogoutButton';
-import TraceabilityScanner from '@/components/TraceabilityScanner';
 
 export default function LabDashboard() {
   const [stats, setStats] = useState({
@@ -11,131 +9,93 @@ export default function LabDashboard() {
     active_batch_count: 0
   });
   
-  const [quarantineQueue, setQuarantineQueue] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [qaProcessingId, setQaProcessingId] = useState<number | null>(null);
-
-  // Label Modal state controls
   const [showLabel, setShowLabel] = useState(false);
   const [labelData, setLabelData] = useState<any>(null);
 
-  const [pendingProcessingBatches, setPendingProcessingBatches] = useState<any[]>([]);
-  
-  // Modal States for Pasteurization
-  const [activeProcessBatch, setActiveProcessBatch] = useState<any | null>(null);
+  // Unified Processing State
+  const [bottleQueue, setBottleQueue] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showProcessModal, setShowProcessModal] = useState(false);
   const [modalInputs, setModalInputs] = useState({ temp: '', time: '', mbt: 'Passed' });
 
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     try {
       const statsRes = await fetch('/api/lab/stats');
       if (statsRes.ok) setStats(await statsRes.json());
-
-      const qaRes = await fetch('/api/lab/qa');
-      if (qaRes.ok) setQuarantineQueue(await qaRes.json());
       
-      fetchProcessingBatches(); 
+      const queueRes = await fetch('/api/lab/batches');
+      if (queueRes.ok) setBottleQueue(await queueRes.json());
+      setSelectedIds([]);
     } catch (error) {
       console.error("Data tracking refresh failed", error);
     }
   };
 
-  const fetchProcessingBatches = async () => {
-    try {
-      const res = await fetch('/api/batches/pending');
-      if (res.ok) setPendingProcessingBatches(await res.json());
-    } catch(e) {
-      console.error(e);
-    }
+  useEffect(() => { fetchData(); }, []);
+
+  const handleToggleRow = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === bottleQueue.length) setSelectedIds([]);
+    else setSelectedIds(bottleQueue.map(b => b.collection_id));
+  };
 
-  const openProcessModal = (batch: any) => {
-    setActiveProcessBatch(batch);
-    setModalInputs({ temp: '', time: '', mbt: 'Passed' });
+  const openProcessModal = (ids: number[]) => {
+    setSelectedIds(ids);
+    setModalInputs({ temp: '62.5', time: '30', mbt: 'Passed' });
+    setShowProcessModal(true);
   };
 
   const handleProcessBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeProcessBatch) return;
-
-    if (!modalInputs.temp || !modalInputs.time) {
-      alert("Please enter both Temperature and Time.");
-      return;
+    if (selectedIds.length === 0) return;
+    if (!modalInputs.temp || !modalInputs.time) { 
+      alert("Please enter both Temperature and Time."); 
+      return; 
     }
 
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/batches/process', {
+      const res = await fetch('/api/lab/batches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          batch_id: activeProcessBatch.batch_id,
-          temp: modalInputs.temp,
-          time: modalInputs.time,
+          ids: selectedIds,
+          temperature: modalInputs.temp,
+          duration: modalInputs.time,
           mbt_result: modalInputs.mbt
         })
       });
+      
+      const data = await res.json();
+      
       if (res.ok) {
-        // THE FIX: Trigger the sticker printing right as it goes to QA!
-        setLabelData({
-          batch_id: activeProcessBatch.batch_id,
-          volume: activeProcessBatch.pooled_volume,
-          temp: modalInputs.temp,
-          time: modalInputs.time
-        });
+        if (data.message?.includes('Flagged')) alert(`⚠️ SAFETY WARNING: ${data.message}`);
+        setLabelData(data.results);
         setShowLabel(true);
-
-        setActiveProcessBatch(null); // Close the processing modal
-        fetchProcessingBatches();
-        fetchDashboardData(); // Refresh stats
-      } else { 
-        alert("Error processing batch."); 
-      }
-    } catch(e) { 
-      alert("Network error."); 
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleQaDecision = async (batchId: number, decision: 'Passed' | 'Failed') => {
-    setQaProcessingId(batchId);
-    try {
-      const response = await fetch('/api/lab/qa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batchId, decision })
-      });
-      const data = await response.json();
-
-      if (response.ok) {
-        fetchDashboardData(); 
+        setShowProcessModal(false);
+        fetchData();
       } else {
         alert(`Error: ${data.error}`);
       }
-    } catch (error) {
-      alert("System failed to log testing verdict.");
-    } finally {
-      setQaProcessingId(null);
+    } catch(e: any) { 
+      alert(`System Error: ${e.message}`); 
+    } finally { 
+      setIsProcessing(false); 
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-body relative text-slate-800">
-      <div className="flex-1 p-8 lg:p-10 overflow-y-auto h-screen max-w-[1600px] mx-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    <div className="min-h-screen bg-slate-50 flex font-body relative text-slate-800 pb-12">
+      <div className="flex-1 p-8 lg:p-10 mx-auto max-w-[1200px]">
         
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-8">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#E04A75] mb-1">Processing Center</p>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">Laboratory Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-1 max-w-xl">Run selective pipelines, verify biological assays, and clear safe milk assets for NICU distribution.</p>
-          </div>
-          <div className="shrink-0 flex items-center gap-4">
-          </div>
+        <div className="mb-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#E04A75] mb-1">Processing Center</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">Vault Overview</h1>
+          <p className="text-sm text-slate-500 mt-1 max-w-xl">Pool raw inventory, log biological assays, and send to Quality Assurance.</p>
         </div>
 
         {/* SUMMARY CARDS */}
@@ -157,42 +117,40 @@ export default function LabDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-          
-          {/* LEFT PANEL: TABLE-BASED PASTEURIZATION MODULE */}
-          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px]">
-            <div className="mb-4 border-b border-slate-100 pb-4 shrink-0">
-              <h3 className="text-lg font-bold text-emerald-600 font-heading mb-1">Pasteurization & MBT Clearance</h3>
-              <p className="text-xs text-slate-500">Log heating metrics and microbiological test (MBT) results for pooled batches sent from the Nurse Station.</p>
+        {/* UNIFIED PASTEURIZATION HUB */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+          <div className="bg-slate-50 border-b border-slate-200 px-6 py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-sm font-black text-[#E04A75] uppercase tracking-wider font-heading">Pasteurization & Processing</h2>
+              <p className="text-xs text-slate-500 mt-1">Select raw bottles to pool, log their pasteurization metrics, and submit to QA.</p>
             </div>
-            
-            {pendingProcessingBatches.length === 0 ? (
-              <div className="text-center py-12 text-sm text-slate-400 font-medium flex-1 flex items-center justify-center border-2 border-dashed border-slate-100 rounded-xl">
-                No active batches awaiting pasteurization.
+            <div className="flex gap-2">
+              <button onClick={() => openProcessModal(selectedIds)} disabled={isProcessing || selectedIds.length === 0} className="bg-amber-500 text-white font-bold text-[10px] px-4 py-2.5 rounded-lg hover:bg-amber-600 shadow-sm disabled:opacity-40 uppercase tracking-wider transition-colors">Process Selected ({selectedIds.length})</button>
+              <button onClick={() => openProcessModal(bottleQueue.map(b => b.collection_id))} disabled={isProcessing || bottleQueue.length === 0} className="bg-slate-900 text-white font-bold text-[10px] px-4 py-2.5 rounded-lg hover:bg-slate-800 shadow-sm disabled:opacity-40 uppercase tracking-wider transition-colors">Process All</button>
+            </div>
+          </div>
+
+          <div className="p-6 flex flex-col flex-1">
+            {bottleQueue.length === 0 ? (
+              <div className="text-center py-16 text-sm text-slate-400 border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/50 flex items-center justify-center h-full">
+                No raw storage bottles waiting for processing.
               </div>
             ) : (
-              <div className="overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border border-slate-200 rounded-xl">
-                <table className="w-full text-left border-collapse bg-slate-50/50">
-                  <thead className="sticky top-0 bg-white z-10 border-b border-slate-200 shadow-sm">
-                    <tr className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                      <th className="py-3 px-5">Batch ID</th>
-                      <th className="py-3 px-5">Pooled Vol</th>
-                      <th className="py-3 px-5 text-right">Action</th>
+              <div className="overflow-y-auto border border-slate-200 rounded-xl flex-1 max-h-[500px]">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-slate-50 shadow-sm z-10">
+                    <tr className="border-b border-slate-200 text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                      <th className="py-4 px-6 w-10"><input type="checkbox" checked={bottleQueue.length > 0 && selectedIds.length === bottleQueue.length} onChange={handleToggleSelectAll} className="accent-[#E04A75] w-4 h-4" /></th>
+                      <th className="py-4 px-6">Log ID</th>
+                      <th className="py-4 px-6 text-right">Volume</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                    {pendingProcessingBatches.map((b) => (
-                      <tr key={b.batch_id} className="hover:bg-slate-100 transition-colors">
-                        <td className="py-4 px-5 font-mono font-bold text-slate-900">#{b.batch_id}</td>
-                        <td className="py-4 px-5 font-black text-indigo-600">{b.pooled_volume} mL</td>
-                        <td className="py-4 px-5 text-right">
-                          <button 
-                            onClick={() => openProcessModal(b)}
-                            className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px] uppercase px-4 py-2 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                          >
-                            Log Data
-                          </button>
-                        </td>
+                  <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                    {bottleQueue.map((bottle) => (
+                      <tr key={bottle.collection_id} className="hover:bg-slate-50/60 cursor-pointer" onClick={() => handleToggleRow(bottle.collection_id)}>
+                        <td className="py-3 px-6"><input type="checkbox" checked={selectedIds.includes(bottle.collection_id)} onChange={() => {}} className="accent-[#E04A75] w-4 h-4" /></td>
+                        <td className="py-3 px-6 font-mono text-slate-500 font-bold">#BOT-{bottle.collection_id}</td>
+                        <td className="py-3 px-6 font-black text-amber-600 text-right">{bottle.raw_volume_ml} mL</td>
                       </tr>
                     ))}
                   </tbody>
@@ -200,168 +158,53 @@ export default function LabDashboard() {
               </div>
             )}
           </div>
-
-          {/* RIGHT PANEL: BIOLOGICAL QUALITY ASSURANCE DESK */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
-            <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Biological QA Check</h2>
-              <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-md border border-indigo-200">
-                {quarantineQueue.length} Awaiting QA
-              </span>
-            </div>
-
-            {quarantineQueue.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 text-xs flex-1 flex items-center justify-center">
-                All batches have been cleared.
-              </div>
-            ) : (
-              <div className="overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                <table className="w-full text-left border-collapse">
-                  <thead className="sticky top-0 bg-slate-50 shadow-sm z-10">
-                    <tr className="border-b border-slate-200 text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                      <th className="py-3 px-6">Batch ID</th>
-                      <th className="py-3 px-6">Volume</th>
-                      <th className="py-3 px-6">Temp (°C)</th>
-                      <th className="py-3 px-6">Time (Min)</th>
-                      <th className="py-3 px-6 text-right">Assay Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                    {quarantineQueue.map((batch) => {
-                      // THE LOGIC: If it has safety flags, lock the pass button!
-                      const hasSafetyFlags = batch.safety_flags !== null;
-                      
-                      return (
-                        <tr key={batch.batch_id} className={`hover:bg-slate-50/60 transition-colors ${hasSafetyFlags ? 'bg-red-50/30 hover:bg-red-50/50' : ''}`}>
-                          <td className="py-4 px-6 font-mono font-bold text-slate-900">#{batch.batch_id}</td>
-                          <td className="py-4 px-6 font-black text-indigo-600 font-heading">{batch.pooled_volume} mL</td>
-                          
-                          <td className={`py-4 px-6 font-bold ${batch.pasteurization_temp < 62.5 ? 'text-red-600' : 'text-slate-700'}`}>
-                            {batch.pasteurization_temp || '--'}°
-                          </td>
-                          <td className={`py-4 px-6 font-bold ${batch.pasteurization_time < 30 ? 'text-red-600' : 'text-slate-700'}`}>
-                            {batch.pasteurization_time || '--'}m
-                          </td>
-
-                          <td className="py-4 px-6 text-right flex justify-end gap-2">
-                            <button
-                              disabled={qaProcessingId !== null || hasSafetyFlags}
-                              onClick={() => handleQaDecision(batch.batch_id, 'Passed')}
-                              className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                              title={hasSafetyFlags ? "LOCKED: Sub-optimal thermal parameters" : "Clear for dispensing"}
-                            >
-                              ✅ Pass
-                            </button>
-                            <button
-                              disabled={qaProcessingId !== null}
-                              onClick={() => handleQaDecision(batch.batch_id, 'Failed')}
-                              className="bg-red-50 text-red-700 border border-red-200 font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                            >
-                              ❌ Discard
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* TRACEABILITY SCANNER SECTION */}
-        <div className="w-full">
-          <TraceabilityScanner />
         </div>
 
       </div>
 
-      {/* OVERLAY LABELS MODAL WINDOW */}
-      {showLabel && (
-        <MilkLabelModal 
-          type="pasteurized" 
-          data={labelData} 
-          onClose={() => setShowLabel(false)} 
-        />
-      )}
+      {/* MODALS */}
+      {showLabel && <MilkLabelModal type="pasteurized" data={labelData} onClose={() => setShowLabel(false)} />}
 
-      {/* PASTEURIZATION POP-UP MODAL */}
-      {activeProcessBatch && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-6 border-b border-slate-100 bg-emerald-50/50">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-black text-emerald-800 tracking-tight font-heading">Process Batch #{activeProcessBatch.batch_id}</h2>
-                  <p className="text-xs font-bold text-emerald-600 mt-1">Total Volume: {activeProcessBatch.pooled_volume} mL</p>
-                </div>
-                <button 
-                  onClick={() => setActiveProcessBatch(null)} 
-                  className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none mt-1"
-                >
-                  ×
-                </button>
-              </div>
+      {/* UNIFIED PROCESSING MODAL */}
+      {showProcessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider font-heading">Process & QA Hand-off</h2>
+              <button onClick={() => setShowProcessModal(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl leading-none">✕</button>
             </div>
-            
-            <form onSubmit={handleProcessBatch} className="p-6 space-y-5">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-2">Measured Temp (°C) <span className="text-slate-400 ml-1 font-medium">- Target: 62.5°C</span></label>
-                <input 
-                  type="number" 
-                  step="0.1" 
-                  required
-                  placeholder="e.g. 62.5" 
-                  value={modalInputs.temp}
-                  onChange={(e) => setModalInputs({...modalInputs, temp: e.target.value})} 
-                  className="w-full border border-slate-300 p-3.5 rounded-xl bg-slate-50 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400 font-mono" 
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-2">Measured Time (Mins) <span className="text-slate-400 ml-1 font-medium">- Target: 30 mins</span></label>
-                <input 
-                  type="number" 
-                  required
-                  placeholder="e.g. 30" 
-                  value={modalInputs.time}
-                  onChange={(e) => setModalInputs({...modalInputs, time: e.target.value})} 
-                  className="w-full border border-slate-300 p-3.5 rounded-xl bg-slate-50 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400 font-mono" 
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-2">Microbiological Test (MBT)</label>
-                <select 
-                  value={modalInputs.mbt}
-                  onChange={(e) => setModalInputs({...modalInputs, mbt: e.target.value})} 
-                  className="w-full border border-slate-300 p-3.5 rounded-xl bg-white text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all font-semibold"
-                >
-                  <option value="Passed">Passed (Sterile / Safe)</option>
-                  <option value="Failed">Failed (Contaminated)</option>
-                </select>
-              </div>
+            <div className="p-6">
+              <p className="text-xs text-slate-500 mb-6">Pooling <span className="font-bold text-amber-600">{selectedIds.length}</span> raw bottles. Input thermal parameters and MBT test results.</p>
               
-              <div className="pt-4 flex gap-3 border-t border-slate-100">
-                <button 
-                  type="button"
-                  onClick={() => setActiveProcessBatch(null)}
-                  className="w-1/3 bg-white border border-slate-300 text-slate-700 text-xs font-bold py-3.5 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  disabled={isProcessing}
-                  className="w-2/3 bg-emerald-600 text-white text-xs font-bold py-3.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 flex justify-center items-center gap-2"
-                >
-                  {isProcessing ? 'Processing...' : 'Send to QA Desk'}
-                </button>
-              </div>
-            </form>
+              <form onSubmit={handleProcessBatch} className="space-y-5">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Cycle Temperature (°C)</label>
+                  <input type="number" step="0.1" required value={modalInputs.temp} onChange={(e) => setModalInputs({...modalInputs, temp: e.target.value})} className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm font-mono focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Cycle Duration (Minutes)</label>
+                  <input type="number" required value={modalInputs.time} onChange={(e) => setModalInputs({...modalInputs, time: e.target.value})} className="w-full border border-slate-300 p-3.5 rounded-xl outline-none text-sm font-mono focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Microbiological Test (MBT)</label>
+                  <select value={modalInputs.mbt} onChange={(e) => setModalInputs({...modalInputs, mbt: e.target.value})} className="w-full border border-slate-300 p-3.5 rounded-xl bg-white text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 font-semibold transition-all">
+                    <option value="Passed">Passed (Sterile / Safe)</option>
+                    <option value="Failed">Failed (Contaminated)</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-slate-100">
+                  <button type="button" onClick={() => setShowProcessModal(false)} className="w-1/3 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold text-xs hover:bg-slate-50 transition-colors">Cancel</button>
+                  <button type="submit" disabled={isProcessing} className="w-2/3 bg-emerald-600 text-white py-3.5 rounded-xl font-bold text-xs hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-sm flex justify-center items-center gap-2">
+                    {isProcessing ? 'Processing...' : 'Submit to QA Desk'}
+                  </button>
+                </div>
+              </form>
+
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

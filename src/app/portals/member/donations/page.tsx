@@ -48,7 +48,7 @@ export default function DonationLedgerPage() {
     setDonationSubmitting(true);
     setDonationMessage(null);
     try {
-      const res = await fetch('/api/collections', {
+      const res = await fetch('/api/member/donate/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,32 +198,33 @@ export default function DonationLedgerPage() {
             </>
           )}
 
-          {/* STATE 2: PENDING (Scheduled, awaiting physical screening) */}
+          {/* STATE 2: PENDING (Scheduled, awaiting nurse confirmation) */}
           {(isDtnActive && profile.dtn_status?.toLowerCase() === 'pending') && (
             <div className="flex flex-col items-center justify-center text-center h-full space-y-4 py-6">
-              <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl mb-1 border border-indigo-200 shadow-sm">📅</div>
-              <span className="bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md -mt-2">Appointment Logged</span>
-              <h2 className="text-lg font-black text-slate-800 font-heading tracking-tight">Present DTN Upon Arrival</h2>
+              <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-2xl mb-1 border border-amber-100 shadow-sm">⏳</div>
+              <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md -mt-2">Awaiting Confirmation</span>
+              <h2 className="text-lg font-black text-slate-800 font-heading tracking-tight">Appointment Request Sent</h2>
               <p className="text-xs text-slate-600 max-w-xs leading-relaxed">
-                Your donation schedule is set. Please proceed to the facility at your chosen time and present this ticket to the nurse to conduct your physical health screening.
+                Your requested donation date is currently being reviewed by the clinic staff. Please wait for them to confirm the schedule.
               </p>
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-2 w-full max-w-xs">
-                <span className="text-xl font-mono font-black text-slate-800">{profile.dtn}</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Temporary Ticket</span>
+                <span className="text-lg font-mono font-black text-slate-400">{profile.dtn}</span>
               </div>
             </div>
           )}
 
-          {/* STATE 3: APPROVED (Ready to go to clinic) */}
+          {/* STATE 3: APPROVED (Confirmed, ready to go to clinic) */}
           {(isDtnActive && profile.dtn_status?.toLowerCase() === 'approved') && (
             <div className="flex flex-col items-center justify-center text-center h-full space-y-4 py-6">
               <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-2xl mb-1 border border-emerald-200 shadow-sm">🏥</div>
-              <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md -mt-2">Approved for Intake</span>
+              <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md -mt-2">Appointment Confirmed</span>
               <h2 className="text-lg font-black text-emerald-700 font-heading tracking-tight">See you at the Clinic!</h2>
               <p className="text-xs text-slate-600 max-w-xs leading-relaxed">
-                Your appointment is confirmed. Please proceed to the facility at your scheduled time. Present this ticket to the nurse upon arrival:
+                Your donation schedule has been approved by the nurse. Please proceed to the facility at your scheduled time and present this ticket:
               </p>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-2 w-full max-w-xs">
-                <span className="text-xl font-mono font-black text-slate-800">{profile.dtn}</span>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-2 w-full max-w-xs border-dashed">
+                <span className="text-xl font-mono font-black text-[#E04A75]">{profile.dtn}</span>
               </div>
             </div>
           )}
