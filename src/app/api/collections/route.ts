@@ -15,15 +15,23 @@ export async function POST(request: Request) {
 
     // 2. Find the Approved Appointment
     const appointment = await prisma.donation_Appointments.findUnique({
-      where: { dtn: cleanDtn },
-      include: { donor: true }
+      where: { dtn: dtn }
     });
 
-    if (!appointment) {
-      return NextResponse.json({ error: "Invalid DTN. Ticket not found." }, { status: 404 });
-    }
+    if (!appointment) return NextResponse.json({ error: "DTN not found" }, { status: 404 });
+
+    // THE FIX: Automatically clear 'Pending' status if the Nurse checked the amber box
     if (appointment.status !== 'Approved') {
-      return NextResponse.json({ error: `Cannot intake milk. Ticket status is: ${appointment.status}` }, { status: 403 });
+      if (confirm_no_new_risks) {
+        // Auto-approve the appointment right now
+        await prisma.donation_Appointments.update({
+          where: { dtn: dtn },
+          data: { status: 'Approved' }
+        });
+      } else {
+        // If the box is unchecked, then block it
+        return NextResponse.json({ error: `Cannot intake milk. Ticket status is: ${appointment.status}` }, { status: 400 });
+      }
     }
 
     // 3. The Intake Transaction (Log milk, close ticket)

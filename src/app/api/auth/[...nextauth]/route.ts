@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 //import { prisma } from "@/lib/prisma"; // 👈 Using your safe global connection!
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 const handler = NextAuth({
   session: { strategy: "jwt" },
   providers: [

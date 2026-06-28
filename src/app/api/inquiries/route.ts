@@ -1,94 +1,98 @@
 import { NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-// Import your authOptions if necessary depending on your setup: import { authOptions } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    // 1. DYNAMIC SESSION GRABBER (Who is the nurse logging this?)
     const session = await getServerSession(); 
-    
     if (!session || !session.user?.email) {
       return NextResponse.json({ error: "Unauthorized session. Please log in." }, { status: 401 });
     }
 
-    // Find the physical staff profile attached to the logged-in user's email
     const staffProfile = await prisma.staff_Profiles.findUnique({
       where: { email: session.user.email }
     });
 
-    if (!staffProfile) {
-      return NextResponse.json({ error: "Staff profile not found for this session." }, { status: 404 });
-    }
+    if (!staffProfile) return NextResponse.json({ error: "Staff profile not found." }, { status: 404 });
 
     const body = await request.json();
-    const { 
-      requester_name, 
-      contact_info, 
-      member_mtn, 
-      inquiry_type, 
-      priority, 
-      required_volume, 
-      infant_gender, 
-      dispensing_program 
-    } = body;
+    const { requester_name, contact_info, member_mtn, inquiry_type, priority, required_volume, infant_gender, dispensing_program } = body;
 
-    let finalMtn = member_mtn || null;
+    // 1. DATABASE DETECTIVE: Search for the Member
+    let foundMember = null;
 
-    // SMART LINKING LOGIC: Search the database!
-    if (!finalMtn && contact_info) {
-      const foundMember = await prisma.member_Profiles.findFirst({
-        where: {
-          OR: [
-            { phone_number: contact_info }, 
-            { email: contact_info }         
-          ]
-        },
-        select: { tracking_no: true }
+    if (member_mtn) {
+      foundMember = await prisma.member_Profiles.findUnique({ where: { tracking_no: member_mtn } });
+    } else if (contact_info) {
+      foundMember = await prisma.member_Profiles.findFirst({
+        where: { OR: [{ phone_number: contact_info }, { email: contact_info }] }
       });
+    }
 
-      if (foundMember) {
-        finalMtn = foundMember.tracking_no; 
+    // 2. THE FAST-LANE (Recognized Members Bypass the Board!)
+    if (foundMember) {
+      // SCENARIO A: Requesting Milk
+      if (inquiry_type === 'Request Milk') {
+        const rtn = `RTN-${Math.floor(100000 + Math.random() * 900000)}`;
+        const volume = required_volume ? Number(required_volume) : 0;
+        
+        await prisma.member_Profiles.update({
+          where: { tracking_no: foundMember.tracking_no },
+          data: {
+            rtn: rtn,
+            rtn_status: 'pending', // <--- Pushes directly to Nurse Medical Reviews
+            rtn_volume: volume,
+            rtn_fee: volume * 2.0, // Base processing fee assumption for walk-ins
+            rtn_infant_gender: infant_gender || 'M',
+            rtn_dispensing_program: dispensing_program || 'In House'
+          }
+        });
+        return NextResponse.json({ message: `Smart Dispatch: ${foundMember.first_name} recognized! Request routed to Medical Reviews.\n\nReceipt Ticket: ${rtn}` }, { status: 201 });
+      } 
+      
+      // SCENARIO B: Donating Milk
+      else if (inquiry_type === 'Donate') {
+        const dtn = `DTN-${Math.floor(100000 + Math.random() * 900000)}`;
+        
+        await prisma.member_Profiles.update({
+          where: { tracking_no: foundMember.tracking_no },
+          data: { dtn: dtn, dtn_status: 'approved' }
+        });
+
+        await prisma.donation_Appointments.create({
+          data: {
+            dtn: dtn,
+            donor_id: foundMember.member_id,
+            appointment_date: new Date(),
+            collection_method: 'Walk-In Triage',
+            status: 'Approved' // <--- Pushes directly to Clinical Intake
+          }
+        });
+        return NextResponse.json({ message: `Smart Dispatch: ${foundMember.first_name} recognized! Walk-in donor routed to Clinical Intake.\n\nDonation Ticket: ${dtn}` }, { status: 201 });
       }
     }
 
-    // Save the inquiry to the database WITH the staff relationship
+    // 3. THE HOLDING PEN (Unregistered Guests & General Questions)
     const newInquiry = await prisma.inquiries.create({
       data: {
         requester_name,
         contact_info,
-        member_mtn: finalMtn,
+        member_mtn: foundMember ? foundMember.tracking_no : null,
         inquiry_type,
         priority,
         required_volume: required_volume ? Number(required_volume) : null,
         infant_gender,
         dispensing_program,
         status: 'Pending',
-        logged_by: staffProfile.staff_id
+        logged_by: staffProfile.staff_id 
       }
     });
 
-    return NextResponse.json({ 
-      message: "Inquiry logged successfully.", 
-      inquiry: newInquiry 
-    }, { status: 201 });
+    return NextResponse.json({ message: "Guest logged to Triage Board.", inquiry: newInquiry }, { status: 201 });
 
   } catch (error) {
     console.error("TRIAGE LOGGING ERROR:", error);
     return NextResponse.json({ error: "Failed to log triage inquiry." }, { status: 500 });
-  }
-}
-
-// GET: Fetch inquiries for the Nurse Dashboard
-export async function GET() {
-  try {
-    const inquiries = await prisma.inquiries.findMany({
-      orderBy: { created_at: 'desc' },
-      take: 15 
-    });
-    return NextResponse.json(inquiries, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to load triage board." }, { status: 500 });
   }
 }
 

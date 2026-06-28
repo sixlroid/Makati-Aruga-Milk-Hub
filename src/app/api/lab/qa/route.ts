@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 
-// GET: Feed the QA Desk Table
 export async function GET() {
   try {
-    const qaBatches = await prisma.milk_Batches.findMany({
-      where: { lab_status: "Pending" }, // Waiting for MBT results
-      orderBy: { batch_id: 'asc' }
+    const quarantineBatches = await prisma.milk_Batches.findMany({
+      where: {
+        pasteurization_temp: { not: null }, 
+        lab_status: 'Flagged'               
+      },
+      orderBy: { batch_id: 'asc' } // <--- CHANGED THIS FROM created_at
     });
-    return NextResponse.json(qaBatches, { status: 200 });
+
+    return NextResponse.json(quarantineBatches, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to load QA desk" }, { status: 500 });
+    console.error("QA Fetch Error:", error);
+    return NextResponse.json({ error: "Failed to fetch quarantine batches" }, { status: 500 });
   }
 }
 
