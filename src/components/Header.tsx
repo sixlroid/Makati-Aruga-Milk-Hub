@@ -1,6 +1,7 @@
 'use client';
 import LogoutButton from '@/components/LogoutButton';
 import { useSession, signOut } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
 const navLinks: Record<string, { label: string; href: string }[]> = {
@@ -29,6 +30,8 @@ const navLinks: Record<string, { label: string; href: string }[]> = {
 
 export default function Header() {
   const { data: session } = useSession();
+  const pathname = usePathname();
+  if (pathname === '/') return null;
 
   const rawRole = (session?.user as { role?: string; tracking_no?: string })?.role;
 const roleMap: Record<string, string> = {
