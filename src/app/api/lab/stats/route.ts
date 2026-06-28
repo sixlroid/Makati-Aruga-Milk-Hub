@@ -3,10 +3,15 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const rawBottles = await prisma.raw_Collections.findMany({ where: { batch_id: null } });
-    const clearedBatches = await prisma.milk_Batches.findMany({ where: { lab_status: "Cleared" } });
+    const pendingBatches = await prisma.milk_Batches.findMany({ 
+      where: { lab_status: 'Pending' } 
+    });
+    
+    const clearedBatches = await prisma.milk_Batches.findMany({ 
+      where: { lab_status: "Cleared" } 
+    });
 
-    const pending_raw_ml = rawBottles.reduce((sum, b) => sum + b.raw_volume_ml, 0);
+    const pending_raw_ml = pendingBatches.reduce((sum, b) => sum + b.current_volume, 0);
     const total_pasteurized_ml = clearedBatches.reduce((sum, b) => sum + b.current_volume, 0);
     const active_batch_count = clearedBatches.length;
 

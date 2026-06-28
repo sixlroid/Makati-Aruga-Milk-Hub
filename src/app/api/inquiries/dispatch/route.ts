@@ -3,57 +3,67 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const { inquiry_id, first_name, last_name, email, dob } = await request.json();
+    const { inquiry_id, first_name, last_name, dob } = await request.json();
 
     // 1. Fetch the original inquiry details
     const inquiry = await prisma.inquiries.findUnique({ where: { inquiry_id: Number(inquiry_id) } });
     if (!inquiry) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
 
-    // 2. Execute the Atomic Upgrade Transaction
-    const result = await prisma.$transaction(async (tx) => {
+    // 2. Generate a guaranteed unique dummy email so Prisma's @unique constraint NEVER crashes
+    const safeEmail = `walkin_${Date.now()}_${Math.floor(Math.random() * 10000)}@local.hospital`;
+
+    // 3. Execute the Atomic Upgrade Transaction
+    const ticketResult = await prisma.$transaction(async (tx) => {
       
-      // A. Create the base User account (Default password for walk-ins)
       const newUser = await tx.users.create({
-        data: { email: email, role: 'member', password: 'Welcome123!' }
+        data: { email: safeEmail, role: 'member', password: 'Welcome123!' }
       });
 
-      // B. Generate the new Member Tracking Number (MID)
       const mtn = `MID-${Math.floor(100000 + Math.random() * 900000)}`;
 
-      // C. Create the Member Profile with required defaults
       const newMember = await tx.member_Profiles.create({
         data: {
           member_id: newUser.user_id,
           tracking_no: mtn,
           first_name,
           last_name,
-          email,
-          phone_number: inquiry.contact_info, // Pulled straight from the triage board!
+          email: safeEmail,
+          phone_number: inquiry.contact_info, 
           date_of_birth: new Date(dob),
           job: 'Walk-in',
           ethnicity: 'Unspecified',
           status: 'Pending',
-          info_source: 'Clinic Walk-in'
+          info_source: 'Clinic Walk-in',
+          rtn_bottle_type: inquiry.bottle_type,
         }
       });
 
-      // D. Dispatch them to the correct Queue (DTN or RTN)
+      let generatedTicket = mtn; 
+
+      // 4. Dispatch them to the correct Queue
       if (inquiry.inquiry_type === 'Request Milk') {
         const rtn = `RTN-${Math.floor(100000 + Math.random() * 900000)}`;
+        generatedTicket = rtn; // Lock in the RTN!
+
         const volume = inquiry.required_volume || 0;
+        const safeBottle = inquiry.bottle_type || 'ameda';
+        const bottleFee = safeBottle === 'ameda' ? 85 : safeBottle === 'korea' ? 65 : 40;
+
         await tx.member_Profiles.update({
           where: { tracking_no: mtn },
           data: {
             rtn: rtn,
             rtn_status: 'pending',
             rtn_volume: volume,
-            rtn_fee: volume * 2.0,
+            rtn_fee: (volume * 2.0) + bottleFee,
             rtn_infant_gender: inquiry.infant_gender || 'M',
             rtn_dispensing_program: inquiry.dispensing_program || 'In House'
           }
         });
       } else if (inquiry.inquiry_type === 'Donate') {
         const dtn = `DTN-${Math.floor(100000 + Math.random() * 900000)}`;
+        generatedTicket = dtn; // Lock in the DTN!
+
         await tx.member_Profiles.update({
           where: { tracking_no: mtn },
           data: { dtn: dtn, dtn_status: 'approved' }
@@ -64,24 +74,28 @@ export async function POST(request: Request) {
             donor_id: newMember.member_id,
             appointment_date: new Date(),
             collection_method: 'Walk-In Triage',
-            status: 'Approved' // Skips scheduling and goes straight to Clinical Intake
+            status: 'Approved' 
           }
         });
       }
 
-      // E. Mark the Triage Inquiry as Resolved and officially link their new MTN
+      // 5. Mark the Triage Inquiry as Resolved (We NO LONGER link the MTN)
       await tx.inquiries.update({
         where: { inquiry_id: inquiry.inquiry_id },
-        data: { status: 'Resolved', member_mtn: mtn }
+        data: { status: 'Resolved' }
       });
 
-      return newMember;
+      return generatedTicket;
     });
 
-    return NextResponse.json({ message: "Guest successfully registered and dispatched!", member: result }, { status: 200 });
+    // 6. Return ONLY the final ticket!
+    return NextResponse.json({ 
+      message: "Dispatched successfully", 
+      ticket: ticketResult 
+    }, { status: 200 });
 
   } catch (error) {
     console.error("DISPATCH ERROR:", error);
-    return NextResponse.json({ error: "Failed to dispatch guest. Ensure email is unique." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to dispatch guest." }, { status: 500 });
   }
 }

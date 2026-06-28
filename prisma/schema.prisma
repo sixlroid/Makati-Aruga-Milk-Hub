@@ -121,6 +121,7 @@ model Inquiries {
   required_volume      Int?              
   infant_gender        String?
   dispensing_program   String?
+  bottle_type          String?           // <--- ADD THIS LINE
 
   // System Tracking
   logged_by            Int

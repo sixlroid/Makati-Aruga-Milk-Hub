@@ -10,7 +10,7 @@ type MemberProfile = {
   dtn_status?: 'Pending' | 'Approved' | 'Rejected' | 'Completed' | null;
   rtn?: string | null;
   
-  rtn_status?: 'pending' | 'approved' | 'rejected' | 'arriving' | null; 
+  rtn_status?: 'pending' | 'approved' | 'rejected' | 'arriving' | 'dispensed' | null; 
   rtn_volume?: number | null;
   rtn_fee?: number | null;
   rtn_remarks?: string | null;
@@ -129,6 +129,9 @@ export default function MemberDashboard() {
     }
   }, [status, activeMtn]);
 
+  const isDtnActive = profile?.dtn && !['completed', 'rejected'].includes(profile.dtn_status?.toLowerCase() || '');
+  const isRtnActive = profile?.rtn && !['completed', 'rejected', 'dispensed'].includes(profile.rtn_status?.toLowerCase() || '');
+
   const totalVolumeDonated = history.reduce((sum, item) => sum + item.raw_volume_ml, 0);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
@@ -152,27 +155,31 @@ export default function MemberDashboard() {
     setMessage(null);
 
     try {
-      const res = await fetch('/api/member/profile', {
-        method: 'PATCH',
+      const cleanMtn = activeMtn?.replace(/['"]/g, '').trim().toUpperCase();
+
+      const res = await fetch('/api/appointments/donate', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tracking_no: activeMtn,
-          ...formState
+          mtn: cleanMtn, 
+          appointment_date: appointmentDate,
+          collection_method: collectionMethod,
+          confirm_no_new_risks: confirmNoNewRisks
         })
       });
       const data = await res.json();
 
       if (res.ok) {
-        setProfile((current) => current ? { ...current, ...data.member } : data.member);
-        setMessage('Identity settings updated successfully.');
+        await fetchMemberData(cleanMtn || '');
+        setDonationMessage(data.message ?? 'Donation appointment scheduled.');
       } else {
-        setMessage(data.error ?? 'Unable to update identity settings.');
+        setDonationMessage(data.error ?? 'Unable to schedule donation.');
       }
     } catch (error) {
-      console.error('Profile update failed', error);
-      setMessage('Unable to reach the identity desk right now.');
+      console.error('Donation scheduling failed', error);
+      setDonationMessage('Network error. Unable to schedule donation.');
     } finally {
-      setSaving(false);
+      setDonationSubmitting(false);
     }
   };
 
@@ -217,7 +224,7 @@ export default function MemberDashboard() {
     setRequestMessage(null);
 
     try {
-      const res = await fetch('/api/member/requests/new', { // <--- Point to the new ticket creator
+      const res = await fetch('/api/member/requests/new', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -322,8 +329,8 @@ export default function MemberDashboard() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Interactive Profile & Identity Settings Desk</h2>
-                  <p className="text-xs text-slate-500 mt-1">Update your display identity, channel contact target, and validation documentation reference safely.</p>
+                  <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider font-heading">Update Profile</h2>
+                  <p className="text-xs text-slate-500 mt-1">Update your personal details..</p>
                 </div>
               </div>
               {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div>}
@@ -355,17 +362,51 @@ export default function MemberDashboard() {
                   </label>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="text-sm text-slate-600">
-                      <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Contact target</span>
+                      <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Email address</span>
                       <input value={formState.email} onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="email or contact alias" />
                     </label>
                     <label className="text-sm text-slate-600">
                       <span className="mb-1 block text-[10px] uppercase tracking-wider font-black text-slate-400">Phone number</span>
-                      <input value={formState.phone_number} onChange={(event) => setFormState((current) => ({ ...current, phone_number: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+                      <input 
+                        type="tel"
+                        value={formState.phone_number} 
+                        onChange={(event) => setFormState((current) => ({ 
+                          ...current, 
+                          phone_number: event.target.value.replace(/\D/g, '') 
+                        }))} 
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" 
+                      />
                     </label>
                   </div>
-                  <button type="submit" disabled={saving} className="rounded-xl bg-[#E04A75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c83b62] disabled:opacity-60">
-                    {saving ? 'Saving…' : 'Save Identity Desk'}
-                  </button>
+                  <div className="flex gap-3 pt-2">
+                    <button 
+                      type="button" 
+                      disabled={saving}
+                      onClick={() => {
+                        if (profile) {
+                          setFormState({
+                            first_name: profile.first_name ?? '',
+                            last_name: profile.last_name ?? '',
+                            middle_initial: profile.middle_initial ?? '',
+                            email: profile.email ?? '',
+                            phone_number: profile.phone_number ?? '',
+                            medical_docs: profile.medical_docs ?? ''
+                          });
+                          setMessage(null); // Clears any success/error messages
+                        }
+                      }}
+                      className="rounded-xl bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors shadow-sm"
+                    >
+                      Discard Edits
+                    </button>
+                    <button 
+                      type="submit" 
+                      disabled={saving} 
+                      className="rounded-xl bg-[#E04A75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c83b62] disabled:opacity-60 transition-colors shadow-sm"
+                    >
+                      {saving ? 'Saving…' : 'Update Profile'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -444,7 +485,13 @@ export default function MemberDashboard() {
 
                       {profile.has_previous_donations && (
                         <label className="flex items-start gap-3 text-sm text-slate-700 cursor-pointer pt-2">
-                          <input type="checkbox" checked={confirmNoNewRisks} onChange={(e) => setConfirmNoNewRisks(e.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#E04A75]" />
+                          <input 
+                            type="checkbox" 
+                            required
+                            checked={confirmNoNewRisks} 
+                            onChange={(e) => setConfirmNoNewRisks(e.target.checked)} 
+                            className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#E04A75]" 
+                          />
                           <span className="text-xs text-slate-600 leading-tight">I confirm that no new health risks, infectious symptoms, or restricted medications have occurred since my last clinical clearance.</span>
                         </label>
                       )}
@@ -456,20 +503,23 @@ export default function MemberDashboard() {
                   </>
                 )}
 
-                  {/* STATE 2: PENDING REVIEW */}
-                  {(profile.dtn && profile.dtn_status?.toLowerCase() === 'pending') && (
+                  {/* STATE 2: PENDING (Scheduled, awaiting physical screening) */}
+                  {(isDtnActive && profile.dtn_status?.toLowerCase() === 'pending') && (
                     <div className="flex flex-col items-center justify-center text-center h-full space-y-4 py-6">
                       <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl mb-1 border border-indigo-200 shadow-sm">📅</div>
-                      <h2 className="text-lg font-black text-slate-800 font-heading">Appointment Pending</h2>
-                      <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
-                        Your donation schedule is currently being reviewed by the clinical staff. You will be cleared shortly.
-                        <br/><br/>Your Ticket: <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded">{profile.dtn}</span>
+                      <span className="bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md -mt-2">Appointment Logged</span>
+                      <h2 className="text-lg font-black text-slate-800 font-heading tracking-tight">Present DTN Upon Arrival</h2>
+                      <p className="text-xs text-slate-600 max-w-xs leading-relaxed">
+                        Your donation schedule is set. Please proceed to the facility at your chosen time and present this ticket to the nurse to conduct your physical health screening.
                       </p>
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-2 w-full max-w-xs">
+                        <span className="text-xl font-mono font-black text-slate-800">{profile.dtn}</span>
+                      </div>
                     </div>
                   )}
 
                   {/* STATE 3: APPROVED (Ready to go to clinic) */}
-                  {(profile.dtn && profile.dtn_status?.toLowerCase() === 'approved') && (
+                  {(isDtnActive && profile.dtn_status?.toLowerCase() === 'approved') && (
                     <div className="flex flex-col items-center justify-center text-center h-full space-y-4 py-6">
                       <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-2xl mb-1 border border-emerald-200 shadow-sm">🏥</div>
                       <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md -mt-2">Approved for Intake</span>
@@ -487,7 +537,8 @@ export default function MemberDashboard() {
 
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[400px]">
                 
-                {(!profile.rtn || profile.rtn_status?.toLowerCase() === 'rejected') && (
+                {/* STATE 1: CAN REQUEST */}
+                {!isRtnActive && (
                   <>
                     <div className="mb-6 border-b border-slate-100 pb-4">
                       <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider font-heading">Request Pasteurized Milk</h2>
@@ -570,8 +621,8 @@ export default function MemberDashboard() {
                 </>
               )}
 
-              {/* ADD THIS NEW STATE BLOCK FOR PENDING */}
-              {(profile.rtn && profile.rtn_status?.toLowerCase() === 'pending') && (
+              {/* STATE 2: PENDING REVIEW */}
+              {(isRtnActive && profile.rtn_status?.toLowerCase() === 'pending') && (
                 <div className="flex flex-col items-center justify-center text-center h-full space-y-4 py-8">
                   <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-2xl mb-2 shadow-sm">🟡</div>
                   <h2 className="text-lg font-black text-slate-800 font-heading">Medical Verification Pending</h2>
@@ -582,19 +633,8 @@ export default function MemberDashboard() {
                 </div>
               )}
               
-              {(profile.rtn && profile.rtn_status?.toLowerCase() === 'approved') && (
-                <div className="flex flex-col items-center justify-center text-center h-full space-y-4 py-8">
-                  <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center text-2xl mb-2">🟡</div>
-                  <h2 className="text-lg font-black text-slate-800 font-heading">Medical Verification Pending</h2>
-                  <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
-                    Your clinical abstract and prescription are currently being verified by our clinical staff against active inventory. Please wait for verification.
-                    <br/><br/>Your Ticket: <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded">{profile.rtn}</span>
-                  </p>
-                  <button className="mt-4 text-xs font-bold text-slate-400 hover:text-red-500 underline decoration-slate-300">Cancel Request</button>
-                </div>
-              )}
-
-                {(profile.rtn && profile.rtn_status?.toLowerCase() === 'approved') && (
+              {/* STATE 3: APPROVED */}
+                {(isRtnActive && profile.rtn_status?.toLowerCase() === 'approved') && (
                   <div className="flex flex-col h-full">
                     <div className="flex justify-between items-start mb-6 border-b border-emerald-100 pb-4">
                       <div>
@@ -652,7 +692,8 @@ export default function MemberDashboard() {
                   </div>
                 )}
 
-                {(profile.rtn && profile.rtn_status?.toLowerCase() === 'arriving') && (
+               {/* STATE 4: ARRIVING */}
+                {(isRtnActive && profile.rtn_status?.toLowerCase() === 'arriving') && (
                   <div className="flex flex-col items-center justify-center text-center h-full space-y-4 py-8">
                     <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-4xl mb-2 shadow-sm border border-emerald-200">🏥</div>
                     <h2 className="text-xl font-black text-emerald-700 font-heading tracking-tight">Please Proceed to the Facility</h2>
@@ -667,7 +708,6 @@ export default function MemberDashboard() {
                 )}
               </div>
             </div>
-
             {/* DONATION HISTORY LEDGER */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">

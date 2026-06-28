@@ -1,39 +1,40 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Setup our timeframes (Today and This Month)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // 1. Calculate Raw Collections (Today & Unbatched)
+    // 🚨 FIX: Removed the "batch_id: null" filter. 
+    // Now it counts ALL milk collected today, period.
     const rawCollections = await prisma.raw_Collections.aggregate({
       _sum: { raw_volume_ml: true },
       where: {
-        date_collected: { gte: today },
-        batch_id: null // Only count milk that hasn't been pasteurized yet
+        date_collected: { gte: today }
       }
     });
 
-    // 2. Count Active Cleared Donors
     const activeDonors = await prisma.member_Profiles.count({
       where: { status: 'Approved' }
     });
 
-    // 3. Calculate Dispensed Milk (This Month)
     const dispensed = await prisma.transactions.aggregate({
       _sum: { dispensed_vol: true },
       where: { timestamp: { gte: firstDayOfMonth } }
     });
 
+    const vaultResult = await prisma.milk_Batches.aggregate({
+      _sum: { current_volume: true },
+      where: { lab_status: 'Cleared' }
+    });
+
     return NextResponse.json({
       raw_volume: rawCollections._sum.raw_volume_ml || 0,
       active_donors: activeDonors || 0,
-      dispensed_volume: dispensed._sum.dispensed_vol || 0
+      dispensed_volume: dispensed._sum.dispensed_vol || 0,
+      pasteurized_volume: vaultResult._sum.current_volume || 0
     }, { status: 200 });
 
   } catch (error) {

@@ -309,7 +309,7 @@ export default function PublicGateway() {
                   <>
                     <div>
                       <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-700">
-                        Phone Number or Member ID
+                        Phone Number or Email
                       </label>
                       <input
                         type="text"

@@ -5,23 +5,25 @@ export async function GET() {
   try {
     const quarantineBatches = await prisma.milk_Batches.findMany({
       where: {
-        pasteurization_temp: { not: null }, 
-        lab_status: 'Flagged'               
+        // THE FIX: Tell the API to fetch BOTH the new 'QA Review' batches AND your old 'Flagged' batches!
+        lab_status: {
+          in: ['QA Review', 'Flagged']
+        }
       },
-      orderBy: { batch_id: 'asc' } // <--- CHANGED THIS FROM created_at
+      orderBy: { batch_id: 'asc' }
     });
 
     return NextResponse.json(quarantineBatches, { status: 200 });
   } catch (error) {
     console.error("QA Fetch Error:", error);
-    return NextResponse.json({ error: "Failed to fetch quarantine batches" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch QA batches" }, { status: 500 });
   }
 }
 
 // POST: Handle the Pass/Discard Buttons
 export async function POST(request: Request) {
   try {
-    const { batchId, decision } = await request.json(); // 'Passed' or 'Failed'
+    const { batchId, decision } = await request.json(); 
 
     let finalStatus = "Cleared";
     let expiryDate = new Date();
