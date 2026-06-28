@@ -103,11 +103,12 @@ export default function Header() {
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white border border-pink-100 rounded-xl shadow-md py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
               {/* Edit Profile Action */}
-              <Link
-                href={`/portals/${role || 'member'}/dashboard`}
-                onClick={() => setDropdownOpen(false)}
-                className="flex items-center w-full px-4 py-2.5 text-sm text-slate-700 hover:text-[#E04A75] hover:bg-pink-50 transition-colors font-semibold border-b border-pink-50"
-              >
+              {/* Edit Profile Action */}
+                <Link
+                  href="/portals/profile" // <-- Change this to a static universal link
+                  onClick={() => setDropdownOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:text-[#E04A75] hover:bg-pink-50 transition-colors font-semibold border-b"
+                >
                 <svg className="w-4 h-4 mr-2 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
