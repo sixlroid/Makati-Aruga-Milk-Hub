@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export const authOptions = {
   session: { strategy: "jwt" as const },
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: "Credentials",
