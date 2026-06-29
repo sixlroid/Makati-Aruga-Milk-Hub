@@ -127,7 +127,7 @@ export default function NurseInquiries() {
               <div className="grid grid-cols-2 gap-4 border-b border-slate-200 pb-4 mb-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Inquiry Type</label>
-                  <select value={inquiryForm.inquiry_type} onChange={(e) => setInquiryForm(p => ({ ...p, inquiry_type: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75] bg-white">
+                  <select value={inquiryForm.inquiry_type} onChange={(e) => setInquiryForm(p => ({ ...p, inquiry_type: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 focus:border-[#E04A75] bg-white">
                     <option value="Request Milk">Requesting Milk</option>
                     <option value="Donate">Donate</option>
                     <option value="General">General Question</option>
@@ -135,26 +135,49 @@ export default function NurseInquiries() {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Urgency Level</label>
-                  <select value={inquiryForm.priority} onChange={(e) => setInquiryForm(p => ({ ...p, priority: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75] bg-white">
+                  <select value={inquiryForm.priority} onChange={(e) => setInquiryForm(p => ({ ...p, priority: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 focus:border-[#E04A75] bg-white">
                     <option value="Standard">Standard (Normal)</option>
                     <option value="Emergency">Emergency (Immediate)</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Requester Name</label><input type="text" required value={inquiryForm.requester_name} onChange={(e) => setInquiryForm(p => ({ ...p, requester_name: e.target.value }))} placeholder="e.g. Maria Santos" className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75]" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Contact Details</label><input type="text" required value={inquiryForm.contact_info} onChange={(e) => setInquiryForm(p => ({ ...p, contact_info: e.target.value }))} placeholder="Phone or email" className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75]" /></div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Requester Name</label>
+                  <input type="text" required value={inquiryForm.requester_name} onChange={(e) => setInquiryForm(p => ({ ...p, requester_name: e.target.value }))} placeholder="e.g. Maria Santos" className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 placeholder-slate-400 focus:border-[#E04A75] bg-white" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Contact Details</label>
+                  <input type="text" required value={inquiryForm.contact_info} onChange={(e) => setInquiryForm(p => ({ ...p, contact_info: e.target.value }))} placeholder="Phone or email" className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 placeholder-slate-400 focus:border-[#E04A75] bg-white" />
+                </div>
               </div>
               
               {inquiryForm.inquiry_type === 'Request Milk' && (
                 <div className="space-y-3 pt-3 border-t border-slate-200">
                   <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                    <div><label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Est. Vol (mL)</label><input type="number" required min="1" value={inquiryForm.required_volume} onChange={(e) => setInquiryForm(p => ({ ...p, required_volume: e.target.value }))} placeholder="250" className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75]" /></div>
-                    <div><label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Infant Gender</label><select value={inquiryForm.infant_gender} onChange={(e) => setInquiryForm(p => ({ ...p, infant_gender: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75] bg-white"><option value="M">Male</option><option value="F">Female</option></select></div>
-                    <div><label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Program</label><select value={inquiryForm.dispensing_program} onChange={(e) => setInquiryForm(p => ({ ...p, dispensing_program: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75] bg-white"><option value="In House">In House</option><option value="Milky Way">Milky Way</option><option value="Donation">Donation</option><option value="POM">POM</option></select></div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Est. Vol (mL)</label>
+                      <input type="number" required min="1" value={inquiryForm.required_volume} onChange={(e) => setInquiryForm(p => ({ ...p, required_volume: e.target.value }))} placeholder="250" className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 placeholder-slate-400 focus:border-[#E04A75] bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Infant Gender</label>
+                      <select value={inquiryForm.infant_gender} onChange={(e) => setInquiryForm(p => ({ ...p, infant_gender: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 focus:border-[#E04A75] bg-white">
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Program</label>
+                      <select value={inquiryForm.dispensing_program} onChange={(e) => setInquiryForm(p => ({ ...p, dispensing_program: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 focus:border-[#E04A75] bg-white">
+                        <option value="In House">In House</option>
+                        <option value="Milky Way">Milky Way</option>
+                        <option value="Donation">Donation</option>
+                        <option value="POM">POM</option>
+                      </select>
+                    </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Bottle Type</label>
-                      <select value={inquiryForm.bottle_type} onChange={(e) => setInquiryForm(p => ({ ...p, bottle_type: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75] bg-white">
+                      <select value={inquiryForm.bottle_type} onChange={(e) => setInquiryForm(p => ({ ...p, bottle_type: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm text-slate-800 focus:border-[#E04A75] bg-white">
                         <option value="ameda">Ameda (+₱85)</option>
                         <option value="korea">Korea Spec (+₱65)</option>
                         <option value="red_cap">Red Cap (+₱40)</option>
@@ -207,9 +230,9 @@ export default function NurseInquiries() {
                             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2 space-y-3">
                               <span className="text-[10px] font-black uppercase text-[#E04A75]">Fast Registration</span>
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <input type="text" placeholder="First Name" required value={guestForm.first_name} onChange={(e) => setGuestForm(p => ({ ...p, first_name: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none" />
-                                <input type="text" placeholder="Last Name" required value={guestForm.last_name} onChange={(e) => setGuestForm(p => ({ ...p, last_name: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none" />
-                                <input type="date" required value={guestForm.dob} onChange={(e) => setGuestForm(p => ({ ...p, dob: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none text-slate-500" />
+                                <input type="text" placeholder="First Name" required value={guestForm.first_name} onChange={(e) => setGuestForm(p => ({ ...p, first_name: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none text-slate-800 placeholder-slate-400" />
+                                <input type="text" placeholder="Last Name" required value={guestForm.last_name} onChange={(e) => setGuestForm(p => ({ ...p, last_name: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none text-slate-800 placeholder-slate-400" />
+                                <input type="date" required value={guestForm.dob} onChange={(e) => setGuestForm(p => ({ ...p, dob: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none text-slate-800" />
                               </div>
                               <div className="flex justify-end gap-2 mt-2">
                                 <button onClick={() => setDispatchingId(null)} className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2 py-1">Cancel</button>
