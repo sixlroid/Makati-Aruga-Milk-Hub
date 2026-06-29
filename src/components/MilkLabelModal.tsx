@@ -42,7 +42,7 @@ export default function MilkLabelModal({
             <div style="position: absolute; top:0; left:0; width:100%; height:100%; display: flex; align-items: center; justify-content: center; opacity: 0.04; font-size: 85px; font-weight: 900; font-style: italic; font-family: sans-serif;">MHMB</div>
             <div style="position: relative; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
               <div style="text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 4px; margin-bottom: 4px;">
-                <h1 style="font-size: 14px; font-weight: bold; margin: 0; text-transform: uppercase;">Makati Human Milk Bank</h1>
+                <h1 style="font-size: 14px; font-weight: bold; margin: 0; text-transform: uppercase;">Makati Aruga Milk Hub</h1>
                 <h2 style="font-size: 11px; font-weight: 600; margin: 2px 0 0 0; text-transform: uppercase;">Unpasteurized Human Breast Milk</h2>
               </div>
               <div style="font-size: 11px; line-height: 1.35;">
@@ -65,7 +65,7 @@ export default function MilkLabelModal({
             <div style="position: absolute; top:0; left:0; width:100%; height:100%; display: flex; align-items: center; justify-content: center; opacity: 0.04; font-size: 85px; font-weight: 900; font-style: italic; font-family: sans-serif;">MHMB</div>
             <div style="position: relative; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
               <div style="text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 4px; margin-bottom: 4px;">
-                <h1 style="font-size: 14px; font-weight: bold; margin: 0; text-transform: uppercase;">Makati Human Milk Bank</h1>
+                <h1 style="font-size: 14px; font-weight: bold; margin: 0; text-transform: uppercase;">Makati Aruga Milk Hub</h1>
                 <h2 style="font-size: 12px; font-weight: 600; margin: 2px 0 0 0; text-transform: uppercase;">Pasteurized Human Milk</h2>
               </div>
               <div style="font-size: 13px; line-height: 1.6; display: flex; flex-direction: column; justify-content: center; flex: 1;">
@@ -135,7 +135,7 @@ export default function MilkLabelModal({
           {type === 'raw' && (
             <div className="relative z-10 flex flex-col h-full justify-between">
               <div className="text-center border-b-2 border-slate-800 pb-1 mb-1">
-                <h1 className="text-sm font-bold uppercase tracking-tight">Makati Human Milk Bank</h1>
+                <h1 className="text-sm font-bold uppercase tracking-tight">Makati Aruga Milk Hub</h1>
                 <h2 className="text-xs font-semibold uppercase">Unpasteurized Human Breast Milk</h2>
               </div>
               <div className="text-[11px] leading-tight space-y-1 font-medium">
@@ -156,7 +156,7 @@ export default function MilkLabelModal({
           {type === 'pasteurized' && (
             <div className="relative z-10 flex flex-col h-full justify-between">
               <div className="text-center border-b-2 border-slate-800 pb-1 mb-2">
-                <h1 className="text-sm font-bold uppercase tracking-tight">Makati Human Milk Bank</h1>
+                <h1 className="text-sm font-bold uppercase tracking-tight">Makati Aruga Milk Hub</h1>
                 <h2 className="text-[13px] font-semibold uppercase">Pasteurized Human Milk</h2>
               </div>
               <div className="text-[13px] leading-relaxed space-y-1 font-medium flex-1 flex flex-col justify-center">

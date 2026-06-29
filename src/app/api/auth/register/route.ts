@@ -51,9 +51,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Please provide a valid date of birth.' }, { status: 400 });
     }
 
-    const hashedPassword = trimmedPassword; // Replace with bcrypt later
+    const hashedPassword = trimmedPassword; 
 
-    // 1. IF REGISTERING A MEMBER
+    // --- 1. Register Member ---
     if (data.role === 'member_donor_receiver') {
       if (!trimmedInfoSource) {
         return NextResponse.json({ error: 'How did you hear about us is required.' }, { status: 400 });
@@ -84,14 +84,10 @@ export async function POST(request: Request) {
         }
       });
 
-      const memberProfile = await prisma.member_Profiles.findUnique({
-        where: { member_id: newUser.user_id }
-      });
-
       return NextResponse.json({ message: "Member registered!", user: newUser }, { status: 201 });
     } 
     
-    // 2. IF REGISTERING STAFF
+    // --- 2. Register Staff ---
     else {
       if (!trimmedEmail || !trimmedProvidedTrackingId) {
         return NextResponse.json({ error: 'Email and staff ID are required for staff registration.' }, { status: 400 });

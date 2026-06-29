@@ -148,7 +148,7 @@ export default function PublicGateway() {
               </div>
 
               <h1 className="mt-6 text-4xl font-black tracking-tight text-[#1A1A1A] lg:text-6xl lg:leading-[1.05]">
-                Makati Human Milk Bank
+                Makati Aruga Milk Hub
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 lg:text-lg">

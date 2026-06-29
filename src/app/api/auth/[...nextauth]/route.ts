@@ -19,7 +19,7 @@ export const authOptions = {
         const normalizedPassword = credentials.password.trim();
         const lookupValue = normalizedInput.toLowerCase();
 
-        const fallbackEmail = process.env.DEV_AUTH_EMAIL?.trim() || "demo@mhmb.local";
+        const fallbackEmail = process.env.DEV_AUTH_EMAIL?.trim() || "demo@mamh.local";
         const fallbackPassword = process.env.DEV_AUTH_PASSWORD?.trim() || "password123";
         const fallbackRole = process.env.DEV_AUTH_ROLE?.trim() || "member_donor_receiver";
         const fallbackCandidates = [
@@ -93,21 +93,21 @@ export const authOptions = {
           email: user.email,
           role: user.role,
           name: userTrackingNumber,
-          fullName: `${(user as any).Member_Profile?.first_name ?? (user as any).Staff_Profile?.first_name ?? ''} ${(user as any).Member_Profile?.last_name ?? (user as any).Staff_Profile?.last_name ?? ''}`.trim(), // <-- Pass real name here
+          fullName: `${(user as any).Member_Profile?.first_name ?? (user as any).Staff_Profile?.first_name ?? ''} ${(user as any).Member_Profile?.last_name ?? (user as any).Staff_Profile?.last_name ?? ''}`.trim(),
         };
       }
     })
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }: any) {
-      // 1. Initial Sign-In
+      // --- 1. Initial Sign-In ---
       if (user) {
         token.role = (user as any).role;
         token.name = (user as any).name ?? token.name;
         token.fullName = (user as any).fullName;
       }
 
-      // 2. Hot-Reloading the Session (When you update your profile)
+      // --- 2. Hot-Reloading Session ---
       if (trigger === "update" && session?.user) {
         token.fullName = session.user.fullName ?? token.fullName;
         token.email = session.user.email ?? token.email;
@@ -116,7 +116,7 @@ export const authOptions = {
       return token;
     },
     async session({ session, token }: any) {
-      // 3. Passing token data into the active session
+      // --- 3. Pass Token Data ---
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).name = token.name ?? session.user.name;

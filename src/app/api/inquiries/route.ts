@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
-import { getToken } from 'next-auth/jwt'; // Use this if you are verifying staff auth
+import { getToken } from 'next-auth/jwt'; 
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // Get the securely logged-in Nurse's ID (Defaults to 2 if testing)
+    // --- Get Staff ID ---
     const token = await getToken({ req: request as any });
     const staffId = token?.sub ? Number(token.sub) : 2;
 
@@ -17,15 +17,10 @@ export async function POST(request: Request) {
         member_mtn: body.member_mtn || null,
         inquiry_type: body.inquiry_type,
         priority: body.priority,
-        
-        // Data casting
         required_volume: body.required_volume ? parseInt(body.required_volume) : null,
         infant_gender: body.infant_gender || null,
         dispensing_program: body.dispensing_program || null,
-        
-        // THE FIX: Explicitly save the bottle type!
         bottle_type: body.bottle_type || 'ameda', 
-        
         logged_by: staffId
       }
     });
@@ -37,7 +32,7 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH: Resolve an inquiry
+// --- Resolve Inquiry ---
 export async function PATCH(request: Request) {
   try {
     const { inquiry_id, status } = await request.json();

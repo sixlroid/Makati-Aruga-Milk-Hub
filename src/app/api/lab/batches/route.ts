@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Fetch bottles that haven't been pooled yet
     const rawQueue = await prisma.raw_Collections.findMany({
       where: { batch_id: null },
       include: { donor: true },
@@ -26,25 +25,23 @@ export async function POST(request: Request) {
     const tempNum = Number(temperature);
     const timeNum = Number(duration);
     
-    // Evaluate Safety Rules automatically
+    // --- Evaluate Safety Rules ---
     let safetyFlags = null;
-    
-    // THE FIX: This MUST be exactly "Pending" to show up in your QA Tab!
     let initialStatus = "Pending"; 
 
     if (tempNum < 62.5 || timeNum < 30 || mbt_result === "Failed") {
       safetyFlags = `Failed params: Temp ${tempNum}°C, Time ${timeNum}m, MBT: ${mbt_result}`;
-      initialStatus = "Flagged"; // Still goes to QA, but highlighted in Red
+      initialStatus = "Flagged"; 
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Calculate total pooled volume
+      // --- Calculate Pooled Volume ---
       const bottles = await tx.raw_Collections.findMany({
         where: { collection_id: { in: ids } }
       });
       const pooledVol = bottles.reduce((sum, b) => sum + b.raw_volume_ml, 0);
 
-      // 2. Create the unified batch record
+      // --- Create Batch Record ---
       const newBatch = await tx.milk_Batches.create({
         data: {
           pooled_volume: pooledVol,
@@ -56,7 +53,7 @@ export async function POST(request: Request) {
         }
       });
 
-      // 3. Link the raw bottles to this new batch ID
+      // --- Link Raw Bottles ---
       await tx.raw_Collections.updateMany({
         where: { collection_id: { in: ids } },
         data: { batch_id: newBatch.batch_id }

@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    // This receives the payload from the Nurse Dashboard
     const { dtn, volume, source } = await request.json();
 
     if (!dtn || !volume) {
@@ -19,8 +18,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid DTN. Appointment not found." }, { status: 404 });
     }
 
+    // --- Execute Transaction ---
     await prisma.$transaction(async (tx) => {
-      // 1. Create the physical collection log (This adds it to Lab Inventory)
       await tx.raw_Collections.create({
         data: {
           dtn_reference: dtn,
@@ -30,13 +29,11 @@ export async function POST(request: Request) {
         }
       });
 
-      // 2. Mark the appointment as Completed
       await tx.donation_Appointments.update({
         where: { dtn },
         data: { status: "Completed" }
       });
 
-      // 3. WIPE THE TICKET: Clear the DTN from the member profile
       await tx.member_Profiles.update({
         where: { member_id: appointment.donor_id },
         data: {

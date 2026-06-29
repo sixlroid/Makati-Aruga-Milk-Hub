@@ -14,19 +14,19 @@ export async function POST(request: Request) {
     const token = await getToken({ req: request as any });
     const staffId = token?.sub ? Number(token.sub) : 2; 
 
-    // THE FIX: Every single batch goes to the QA Desk now.
+    // --- Safety Lock Verification ---
     let safetyFlags = null;
 
-    // If temp is too low, time is too short, or MBT fails -> Trigger the Safety Lock!
     if (numTemp < 62.5 || numTime < 30 || mbt_result === 'Failed') {
       safetyFlags = `System Auto-Flag: Temp(${numTemp}°C), Time(${numTime}m), MBT(${mbt_result})`;
     }
 
+    // --- Execute Transaction ---
     await prisma.$transaction([
       prisma.milk_Batches.update({
         where: { batch_id: Number(batch_id) },
         data: {
-          lab_status: 'QA Review', // Everything waits for manual sign-off
+          lab_status: 'QA Review',
           pasteurization_temp: numTemp,
           pasteurization_time: numTime,
           safety_flags: safetyFlags,

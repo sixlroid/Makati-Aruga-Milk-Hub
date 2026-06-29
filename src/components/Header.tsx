@@ -64,7 +64,7 @@ export default function Header() {
             </svg>
           </div>
           <span className="text-base font-black text-slate-800 tracking-tight">
-            Makati Human Milk Bank
+            Makati Aruga Milk Hub
           </span>
         </div>
 

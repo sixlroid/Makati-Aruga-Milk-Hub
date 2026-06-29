@@ -16,7 +16,7 @@ const manrope = Manrope({
 });
 
 export const metadata = {
-  title: 'Makati Human Milk Bank',
+  title: 'Makati Aruga Milk Hub',
   description: 'Operations Portal',
 };
 

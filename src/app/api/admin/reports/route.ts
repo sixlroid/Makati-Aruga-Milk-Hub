@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { jsPDF } from 'jspdf';
-import { prisma } from "@/lib/prisma"; // (adjust the ../ based on folder depth, or use @/lib/prisma if it works)
+import { prisma } from "@/lib/prisma"; 
 
 type ReportType = 'collections' | 'processing' | 'dispensing';
 type ReportFormat = 'csv' | 'pdf';

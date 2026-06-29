@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { prisma } from "../../../../lib/prisma"; // Adjust this path if needed (e.g., '@/lib/prisma')
+import { prisma } from "../../../../lib/prisma"; 
 import { formatTrackingNumberForRole } from '@/lib/identifiers';
-import { getToken } from 'next-auth/jwt'; // 👈 NEW: Imports the secure token reader
+import { getToken } from 'next-auth/jwt'; 
 
 function getDisplayRole(role: string) {
   if (role === 'admin') return 'Administrator';
@@ -90,15 +90,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    // 👈 NEW: Read the secure session token to find out WHICH Admin is clicking the button
     const token = await getToken({ req: request as any });
     
-    // Security check: Make sure they are actually logged in
     if (!token || !token.sub) {
       return NextResponse.json({ error: 'Unauthorized access.' }, { status: 401 });
     }
     
-    // The "sub" property of a JWT token holds the user's ID!
     const adminStaffId = Number(token.sub);
 
     const data = await request.json();
@@ -135,7 +132,6 @@ export async function POST(request: Request) {
         });
       }
 
-      // 👈 NEW: Log the Deactivation to the Database dynamically!
       await prisma.audit_Logs.create({
         data: {
           staff_id: adminStaffId,
@@ -154,7 +150,6 @@ export async function POST(request: Request) {
     await prisma.staff_Profiles.deleteMany({ where: { staff_id: Number(userId) } });
     await prisma.users.delete({ where: { user_id: Number(userId) } });
 
-    // 👈 NEW: Log the Deletion to the Database dynamically!
     await prisma.audit_Logs.create({
       data: {
         staff_id: adminStaffId,

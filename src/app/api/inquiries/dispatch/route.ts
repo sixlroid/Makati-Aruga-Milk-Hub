@@ -5,14 +5,14 @@ export async function POST(request: Request) {
   try {
     const { inquiry_id, first_name, last_name, dob } = await request.json();
 
-    // 1. Fetch the original inquiry details
+    // --- Fetch Original Inquiry ---
     const inquiry = await prisma.inquiries.findUnique({ where: { inquiry_id: Number(inquiry_id) } });
     if (!inquiry) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
 
-    // 2. Generate a guaranteed unique dummy email so Prisma's @unique constraint NEVER crashes
+    // --- Generate Safe Email ---
     const safeEmail = `walkin_${Date.now()}_${Math.floor(Math.random() * 10000)}@local.hospital`;
 
-    // 3. Execute the Atomic Upgrade Transaction
+    // --- Execute Upgrade Transaction ---
     const ticketResult = await prisma.$transaction(async (tx) => {
       
       const newUser = await tx.users.create({
@@ -40,10 +40,10 @@ export async function POST(request: Request) {
 
       let generatedTicket = mtn; 
 
-      // 4. Dispatch them to the correct Queue
+      // --- Dispatch to Queue ---
       if (inquiry.inquiry_type === 'Request Milk') {
         const rtn = `RTN-${Math.floor(100000 + Math.random() * 900000)}`;
-        generatedTicket = rtn; // Lock in the RTN!
+        generatedTicket = rtn; 
 
         const volume = inquiry.required_volume || 0;
         const safeBottle = inquiry.bottle_type || 'ameda';
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
         });
       } else if (inquiry.inquiry_type === 'Donate') {
         const dtn = `DTN-${Math.floor(100000 + Math.random() * 900000)}`;
-        generatedTicket = dtn; // Lock in the DTN!
+        generatedTicket = dtn; 
 
         await tx.member_Profiles.update({
           where: { tracking_no: mtn },
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
         });
       }
 
-      // 5. Mark the Triage Inquiry as Resolved (We NO LONGER link the MTN)
+      // --- Resolve Triage Inquiry ---
       await tx.inquiries.update({
         where: { inquiry_id: inquiry.inquiry_id },
         data: { status: 'Resolved' }
@@ -88,7 +88,6 @@ export async function POST(request: Request) {
       return generatedTicket;
     });
 
-    // 6. Return ONLY the final ticket!
     return NextResponse.json({ 
       message: "Dispatched successfully", 
       ticket: ticketResult 

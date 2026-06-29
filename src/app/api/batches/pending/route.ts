@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Look for auto-generated Batches that have NOT been given a temperature yet
     const pendingBatches = await prisma.milk_Batches.findMany({
       where: { 
         lab_status: 'Pending',
