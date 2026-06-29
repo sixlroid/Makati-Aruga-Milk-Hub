@@ -125,8 +125,8 @@ export default function LabDashboard() {
               <p className="text-xs text-slate-500 mt-1">Select raw bottles to pool, log their pasteurization metrics, and submit to QA.</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => openProcessModal(selectedIds)} disabled={isProcessing || selectedIds.length === 0} className="bg-amber-500 text-white font-bold text-[10px] px-4 py-2.5 rounded-lg hover:bg-amber-600 shadow-sm disabled:opacity-40 uppercase tracking-wider transition-colors">Process Selected ({selectedIds.length})</button>
-              <button onClick={() => openProcessModal(bottleQueue.map(b => b.collection_id))} disabled={isProcessing || bottleQueue.length === 0} className="bg-slate-900 text-white font-bold text-[10px] px-4 py-2.5 rounded-lg hover:bg-slate-800 shadow-sm disabled:opacity-40 uppercase tracking-wider transition-colors">Process All</button>
+              <button onClick={() => openProcessModal(selectedIds)} disabled={isProcessing || selectedIds.length === 0} className="bg-amber-500 text-white font-bold text-[10px] px-4 py-2.5 rounded-lg hover:bg-amber-600 shadow-sm disabled:opacity-40 uppercase tracking-wider transition-colors">Pasteurize ({selectedIds.length})</button>
+              <button onClick={() => openProcessModal(bottleQueue.map(b => b.collection_id))} disabled={isProcessing || bottleQueue.length === 0} className="bg-slate-900 text-white font-bold text-[10px] px-4 py-2.5 rounded-lg hover:bg-slate-800 shadow-sm disabled:opacity-40 uppercase tracking-wider transition-colors">Pasteurize All</button>
             </div>
           </div>
 
