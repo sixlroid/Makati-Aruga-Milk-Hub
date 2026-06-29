@@ -8,6 +8,9 @@ export default function NurseInquiries() {
   const [confirmDocs, setConfirmDocs] = useState(false);
   const [dispatchingId, setDispatchingId] = useState<number | null>(null);
   const [guestForm, setGuestForm] = useState({ first_name: '', last_name: '', dob: '' });
+  
+  // NEW STATE: To lock the dispatch button specifically
+  const [isGeneratingTicket, setIsGeneratingTicket] = useState(false);
 
   const [inquiryForm, setInquiryForm] = useState({
     requester_name: '', contact_info: '', inquiry_type: 'Request Milk',
@@ -29,6 +32,10 @@ export default function NurseInquiries() {
 
   const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // ANTI-SPAM LOCK 1: If it's already saving, ignore all extra clicks
+    if (isSavingInquiry) return; 
+    
     setIsSavingInquiry(true);
     try {
       const res = await fetch('/api/inquiries', {
@@ -51,7 +58,11 @@ export default function NurseInquiries() {
       } else {
         alert("Error saving inquiry.");
       }
-    } catch (e) { console.error(e); } finally { setIsSavingInquiry(false); }
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setIsSavingInquiry(false); 
+    }
   };
 
   const handleResolveInquiry = async (id: number) => {
@@ -62,6 +73,10 @@ export default function NurseInquiries() {
   };
 
   const handleDispatchGuest = async (inquiry_id: number) => {
+    // ANTI-SPAM LOCK 2: Prevent multiple DTN tickets from being generated!
+    if (isGeneratingTicket) return;
+    
+    setIsGeneratingTicket(true);
     try {
       const res = await fetch('/api/inquiries/dispatch', {
         method: 'POST',
@@ -78,7 +93,11 @@ export default function NurseInquiries() {
       } else {
         alert(`Error: ${data.error || "System Error."}`);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e); 
+    } finally {
+      setIsGeneratingTicket(false);
+    }
   };
 
   return (
@@ -109,16 +128,16 @@ export default function NurseInquiries() {
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Inquiry Type</label>
                   <select value={inquiryForm.inquiry_type} onChange={(e) => setInquiryForm(p => ({ ...p, inquiry_type: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75] bg-white">
-                    <option value="Request Milk">🍼 Requesting Milk</option>
-                    <option value="Donate">💝 Want to Donate</option>
-                    <option value="General">ℹ️ General Question</option>
+                    <option value="Request Milk">Requesting Milk</option>
+                    <option value="Donate">Donate</option>
+                    <option value="General">General Question</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-2">Urgency Level</label>
                   <select value={inquiryForm.priority} onChange={(e) => setInquiryForm(p => ({ ...p, priority: e.target.value }))} className="w-full border border-slate-300 p-2.5 rounded-lg outline-none text-sm focus:border-[#E04A75] bg-white">
                     <option value="Standard">Standard (Normal)</option>
-                    <option value="Emergency">🚨 Emergency (Immediate)</option>
+                    <option value="Emergency">Emergency (Immediate)</option>
                   </select>
                 </div>
               </div>
@@ -144,12 +163,14 @@ export default function NurseInquiries() {
                   </div>
                   <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-colors">
                     <input type="checkbox" required checked={confirmDocs} onChange={(e) => setConfirmDocs(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#E04A75] rounded" />
-                    <span className="text-xs text-slate-700 font-medium">I confirm the requester has presented a hard or soft copy of the required medical documents (Clinical Abstract & Prescription). [cite: 117]</span>
+                    <span className="text-xs text-slate-700 font-medium">I confirm the requester has presented a hard or soft copy of the required medical documents (Clinical Abstract & Prescription).</span>
                   </label>
                 </div>
               )}
 
-              <button type="submit" disabled={isSavingInquiry} className="w-full bg-[#1A1A1A] text-white py-3 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 mt-2 shadow-sm">{isSavingInquiry ? 'Logging Triage...' : 'Log Walk-In Request'}</button>
+              <button type="submit" disabled={isSavingInquiry} className="w-full bg-[#1A1A1A] text-white py-3 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 mt-2 shadow-sm">
+                {isSavingInquiry ? 'Logging Triage...' : 'Log Walk-In Request'}
+              </button>
             </form>
 
             <div className="border border-slate-200 rounded-2xl bg-white shadow-inner overflow-hidden flex flex-col">
@@ -158,7 +179,7 @@ export default function NurseInquiries() {
               </div>
               <div className="p-4 space-y-3 overflow-y-auto max-h-[440px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {inquiries.length === 0 ? (
-                  <div className="text-center py-8 text-sm text-slate-400">No walk-ins on the board. [cite: 120]</div>
+                  <div className="text-center py-8 text-sm text-slate-400">No walk-ins on the board.</div>
                 ) : (
                   inquiries.map((item) => (
                     <div key={item.inquiry_id} className={`rounded-xl border p-4 transition-colors ${item.status === 'Resolved' ? 'bg-slate-50 border-slate-100 opacity-60' : item.priority === 'Emergency' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -174,7 +195,7 @@ export default function NurseInquiries() {
                           <p className={`font-bold ${item.status === 'Resolved' ? 'text-slate-500' : 'text-slate-800'}`}>{item.requester_name}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-slate-500">{item.contact_info}</span>
-                            <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-bold">Walk-in Guest [cite: 125]</span>
+                            <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-bold">Walk-in Guest</span>
                           </div>
                         </div>
                         {item.required_volume && <div className="text-right"><span className="text-sm font-black text-[#E04A75]">{item.required_volume} mL</span></div>}
@@ -184,7 +205,7 @@ export default function NurseInquiries() {
                         <div className="mt-4 pt-3 border-t border-slate-100/50">
                           {dispatchingId === item.inquiry_id ? (
                             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2 space-y-3">
-                              <span className="text-[10px] font-black uppercase text-[#E04A75]">Fast Registration [cite: 128]</span>
+                              <span className="text-[10px] font-black uppercase text-[#E04A75]">Fast Registration</span>
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <input type="text" placeholder="First Name" required value={guestForm.first_name} onChange={(e) => setGuestForm(p => ({ ...p, first_name: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none" />
                                 <input type="text" placeholder="Last Name" required value={guestForm.last_name} onChange={(e) => setGuestForm(p => ({ ...p, last_name: e.target.value }))} className="text-xs p-2 rounded border border-slate-300 outline-none" />
@@ -192,13 +213,15 @@ export default function NurseInquiries() {
                               </div>
                               <div className="flex justify-end gap-2 mt-2">
                                 <button onClick={() => setDispatchingId(null)} className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2 py-1">Cancel</button>
-                                <button onClick={() => handleDispatchGuest(item.inquiry_id)} className="text-[10px] font-bold bg-[#E04A75] text-white px-3 py-1.5 rounded hover:bg-[#c83b62] shadow-sm">Confirm & Dispatch to Queue [cite: 131]</button>
+                                <button onClick={() => handleDispatchGuest(item.inquiry_id)} disabled={isGeneratingTicket} className="text-[10px] font-bold bg-[#E04A75] text-white px-3 py-1.5 rounded hover:bg-[#c83b62] shadow-sm disabled:opacity-50">
+                                  {isGeneratingTicket ? 'Generating...' : 'Confirm & Dispatch to Queue'}
+                                </button>
                               </div>
                             </div>
                           ) : (
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => setDispatchingId(item.inquiry_id)} className="text-[10px] font-black bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors shadow-sm">⚡ Register & Dispatch [cite: 133]</button>
-                              <button onClick={() => handleResolveInquiry(item.inquiry_id)} className="text-[10px] font-bold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded transition-colors shadow-sm">Mark as Resolved [cite: 134]</button>
+                              <button onClick={() => setDispatchingId(item.inquiry_id)} className="text-[10px] font-black bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors shadow-sm">⚡ Register & Dispatch</button>
+                              <button onClick={() => handleResolveInquiry(item.inquiry_id)} className="text-[10px] font-bold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded transition-colors shadow-sm">Mark as Resolved</button>
                             </div>
                           )}
                         </div>
