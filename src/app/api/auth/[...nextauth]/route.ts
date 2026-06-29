@@ -98,18 +98,15 @@ export const authOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }: any) {
+      // 1. Initial Sign-In
       if (user) {
         token.role = (user as any).role;
         token.name = (user as any).name ?? token.name;
         token.fullName = (user as any).fullName;
       }
 
-      // When the client calls updateSession({...}), NextAuth re-invokes this
-      // callback with trigger === "update" and the payload passed to
-      // updateSession() available as `session`. Without this branch, the
-      // token never changes after initial sign-in, so the UI keeps showing
-      // stale data even though the database was updated successfully.
+      // 2. Hot-Reloading the Session (When you update your profile)
       if (trigger === "update" && session?.user) {
         token.fullName = session.user.fullName ?? token.fullName;
         token.email = session.user.email ?? token.email;
@@ -117,7 +114,8 @@ export const authOptions = {
 
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
+      // 3. Passing token data into the active session
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).name = token.name ?? session.user.name;
