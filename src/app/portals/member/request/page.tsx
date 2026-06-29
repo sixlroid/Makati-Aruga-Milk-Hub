@@ -59,12 +59,36 @@ export default function RequestMilkPage() {
     }
   };
 
+  // --- Helper: Convert File to Base64 String ---
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // --- Request Handler ---
   const handleRequestMilk = async (event: FormEvent) => {
     event.preventDefault();
     setRequestSubmitting(true);
     setRequestMessage(null);
+
     try {
-      const res = await fetch('/api/dispense', {
+      // 1. Convert the attached files into Base64 strings so they can travel via JSON
+      let abstractBase64 = null;
+      let prescriptionBase64 = null;
+
+      if (clinicalAbstract) {
+        abstractBase64 = await fileToBase64(clinicalAbstract);
+      }
+      if (prescription) {
+        prescriptionBase64 = await fileToBase64(prescription);
+      }
+
+      // 2. Fetch the correct backend route and INCLUDE the files in the payload
+      const res = await fetch('/api/member/requests/new', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,16 +98,19 @@ export default function RequestMilkPage() {
           infant_gender: infantGender,
           dispensing_program: dispensingProgram,
           bottle_type: bottleType,
-          cost: estimatedFee
+          cost: estimatedFee,
+          clinical_abstract: abstractBase64,  // <-- Successfully attached!
+          prescription: prescriptionBase64    // <-- Successfully attached!
         })
       });
+
       const data = await res.json();
       
       if (res.ok) {
-        // THE FIX: Forcibly override the local profile state to trigger STATE 2 instantly
+        // Optimistic UI Update
         setProfile((prevProfile: any) => ({
           ...prevProfile,
-          rtn: data.rtn || prevProfile.rtn || 'GENERATING...', // Use API RTN or fallback
+          rtn: data.rtn || prevProfile.rtn || 'GENERATING...', 
           rtn_status: 'pending' 
         }));
         
@@ -91,7 +118,7 @@ export default function RequestMilkPage() {
         setRequestHospital('');
         
         // Silently fetch the real backend state in the background
-        if (activeMtn) await fetchProfile(activeMtn); 
+        if (activeMtn) await fetchProfile(activeMtn);
       } else {
         setRequestMessage(data.error ?? 'Request rejected by routing gate.');
       }

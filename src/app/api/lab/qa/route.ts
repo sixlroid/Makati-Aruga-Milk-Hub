@@ -5,9 +5,10 @@ export async function GET() {
   try {
     const quarantineBatches = await prisma.milk_Batches.findMany({
       where: {
-        // THE FIX: Tell the API to fetch BOTH the new 'QA Review' batches AND your old 'Flagged' batches!
+        // THE FIX: We added 'Pending' so it perfectly matches your batches route! 
+        // Keeping 'QA Review' just in case old test batches are stuck in there.
         lab_status: {
-          in: ['QA Review', 'Flagged']
+          in: ['Pending', 'QA Review', 'Flagged']
         }
       },
       orderBy: { batch_id: 'asc' }
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       message: finalStatus === "Cleared" ? "Milk moved to Safe Vault." : "Contaminated batch destroyed." 
     }, { status: 200 });
+
   } catch (error) {
     return NextResponse.json({ error: "Failed to log QA decision" }, { status: 500 });
   }

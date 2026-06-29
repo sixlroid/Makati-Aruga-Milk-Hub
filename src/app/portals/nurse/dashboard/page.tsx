@@ -28,18 +28,19 @@ export default function CollectingAndDispensingDashboard() {
   const [showLabel, setShowLabel] = useState(false);
   const [labelData, setLabelData] = useState<any>(null);
 
+  // --- THE FIX: Block Next.js Caching ---
   const fetchStats = async () => {
-    try { const res = await fetch('/api/nurse/stats');
+    try { const res = await fetch('/api/nurse/stats', { cache: 'no-store' });
     if (res.ok) setStats(await res.json()); } catch (e) {}
   };
 
   const fetchRequests = async () => {
-    try { const res = await fetch('/api/nurse/requests');
+    try { const res = await fetch('/api/nurse/requests', { cache: 'no-store' });
     if (res.ok) setRequests(await res.json()); } catch (e) {}
   };
 
   const fetchAppointments = async () => {
-    try { const res = await fetch('/api/nurse/appointments');
+    try { const res = await fetch('/api/nurse/appointments', { cache: 'no-store' });
     if (res.ok) setAppointments(await res.json()); } catch (e) {}
   };
 
@@ -48,6 +49,36 @@ export default function CollectingAndDispensingDashboard() {
     fetchRequests();
     fetchAppointments();
   }, []);
+
+  // --- THE FIX: Secure Document Viewer for JPGs & PDFs ---
+  const openDocument = (base64Data: string | undefined) => {
+    if (!base64Data) return;
+    try {
+      if (!base64Data.startsWith('data:')) {
+        window.open(base64Data, '_blank');
+        return;
+      }
+      const arr = base64Data.split(',');
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      if (!mimeMatch) return;
+      const mime = mimeMatch[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Cleanup the temporary file from memory after 10 seconds
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to load document.");
+    }
+  };
 
   const handleApproveAppointment = async (dtn: string) => {
     try {
@@ -261,8 +292,8 @@ export default function CollectingAndDispensingDashboard() {
                           <span className="bg-amber-100 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded">Requested: {req.requested_volume}mL</span>
                         </div>
                         <div className="flex gap-2 mb-4">
-                          <button disabled={!req.rtn_abstract} onClick={() => window.open(req.rtn_abstract, '_blank')} className="flex-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 py-1.5 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50">📄 View Abstract</button>
-                          <button disabled={!req.rtn_prescription} onClick={() => window.open(req.rtn_prescription, '_blank')} className="flex-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 py-1.5 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50">📄 View Prescription</button>
+                          <button disabled={!req.rtn_abstract} onClick={() => openDocument(req.rtn_abstract)} className="flex-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 py-1.5 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50">📄 View Abstract</button>
+                          <button disabled={!req.rtn_prescription} onClick={() => openDocument(req.rtn_prescription)} className="flex-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 py-1.5 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50">📄 View Prescription</button>
                         </div>
                         <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-indigo-50/40 rounded-lg border border-indigo-100/50">
                           <div><span className="block text-[9px] font-bold text-indigo-400 uppercase mb-0.5">Gender</span><span className="text-xs font-semibold text-indigo-900">{req.infant_gender === 'M' ? 'Male' : 'Female'}</span></div>
