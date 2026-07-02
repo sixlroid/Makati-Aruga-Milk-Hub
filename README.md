@@ -1,37 +1,29 @@
-MHMB
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Makati Aruga Milk Hub (MAMH)
 
-## Getting Started
+**A Web-Based Human Milk Bank Management System**
 
-First, run the development server:
+## Project Overview
+The MHMB Portal is a secure, end-to-end web application designed to digitize and streamline the entire lifecycle of human milk banking. It eliminates the human errors associated with traditional tracking by ensuring biological safety, strict regulatory compliance, and operational efficiency for donors, medical staff, and laboratory technicians.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+**Live Application:** [https://mhmb.vercel.app/](https://mhmb.vercel.app/)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Key Features
+* **Role-Based Workflows:** Distinct, secure portals tailored for Members, Nurses, Lab Staff, and Administrators.
+* **Automated Traceability:** Auto-generated tracking numbers (DTN for donations, RTN for requests) for seamless walk-in and registered processing.
+* **Safety Integration:** Enforced health screening validations (with automated 3-month validity periods) and rigid pasteurization lab logging, including MBT clearance and automatic discard protocols.
+* **Real-Time Inventory & Billing:** Automated volume deduction upon dispensing and dynamic fee calculation (base fee + deposit) to eliminate manual computing errors.
+* **Comprehensive Reporting:** Administrators can generate and download system reports (Collections, Processing, Dispensing) in CSV and PDF formats.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
+* **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS
+* **Backend:** Next.js Route Handlers (Serverless API endpoints)
+* **Database:** PostgreSQL (hosted serverless on Neon DB)
+* **ORM:** Prisma Client (handles database queries and atomic transactions)
+* **Authentication:** NextAuth.js (JWT strategy and Credentials provider)
+* **Deployment:** Vercel (CI/CD pipeline with Edge Network routing)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Local Setup Instructions
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Prerequisites
+* Node.js: Version 18.x or higher.
+* Package Manager: npm, yarn, or pnpm.
