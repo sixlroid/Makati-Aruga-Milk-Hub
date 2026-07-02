@@ -22,8 +22,6 @@ The MHMB Portal is a secure, end-to-end web application designed to digitize and
 * **Authentication:** NextAuth.js (JWT strategy and Credentials provider)
 * **Deployment:** Vercel (CI/CD pipeline with Edge Network routing)
 
-## Local Setup Instructions
-
-### Prerequisites
+## Local Setup Instructions (Prerequisites)
 * Node.js: Version 18.x or higher.
 * Package Manager: npm, yarn, or pnpm.
